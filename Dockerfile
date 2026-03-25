@@ -8,11 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY server/requirements.txt /tmp/requirements.txt
+COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
-# Copy the entire environment
-COPY . /app/incident_response_env/
+# Copy the Python package and baseline script
+COPY incident_response_env/ /app/incident_response_env/
+COPY baseline.py /app/baseline.py
 
 # Set Python path so imports work
 ENV PYTHONPATH=/app
