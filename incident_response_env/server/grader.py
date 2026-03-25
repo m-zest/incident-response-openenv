@@ -79,6 +79,7 @@ def compute_final_score(
     optimal_steps: int,
     destructive_actions: int,
     resolved: bool,
+    timed_out_resolved: bool = False,
 ) -> float:
     """
     Compute the final episode score using the deterministic formula.
@@ -86,7 +87,10 @@ def compute_final_score(
     S = max(0, (H_final - H_initial) / (100 - H_initial) * omega - phi - psi)
 
     Where:
-      omega = 1.0 if root cause correctly identified, 0.6 if fixed without diagnosis, 0.3 otherwise
+      omega = 1.0 if root cause correctly identified
+      omega = 0.8 if fixed and ran out of steps (partial credit)
+      omega = 0.6 if fixed without diagnosis
+      omega = 0.3 otherwise
       phi = 0.02 per step beyond optimal (capped at 0.3)
       psi = 0.15 per destructive action
     """
@@ -99,6 +103,8 @@ def compute_final_score(
     # Omega: diagnostic multiplier
     if root_cause_found:
         omega = 1.0
+    elif timed_out_resolved:
+        omega = 0.8  # Fixed it, ran out of steps before diagnosing
     elif resolved:
         omega = 0.6  # Fixed it but didn't identify root cause
     else:
