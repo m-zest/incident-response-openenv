@@ -97,7 +97,7 @@ class SimulatedCluster:
         elif command == "check_network":
             return self._check_network(target)
         elif command == "submit_root_cause":
-            return self._submit_root_cause(target)
+            return self._submit_root_cause(target, parameters)
         else:
             return f"ERROR: Unknown command '{command}'. Use list_alerts, check_logs, get_metrics, check_dependencies, restart_service, scale_up, rollback_deploy, check_process_list, check_network, or submit_root_cause."
 
@@ -260,31 +260,44 @@ class SimulatedCluster:
             return f"=== Network Connections for {service} ===\n  No active connections."
         return f"=== Network Connections for {service} ===\n" + "\n".join(f"  {n}" for n in net)
 
-    def _submit_root_cause(self, description: str) -> str:
-        self.submitted_root_cause = description
+    def _submit_root_cause(self, description: str, parameters: dict = None) -> str:
+        # Merge target string with any description/reason in parameters
+        # LLMs sometimes send: {"command": "submit_root_cause", "target": "", "parameters": {"description": "..."}}
+        parts = [description]
+        if parameters:
+            for key in ("description", "reason", "root_cause", "diagnosis", "text"):
+                if key in parameters and parameters[key]:
+                    parts.append(str(parameters[key]))
+        merged = " ".join(p for p in parts if p)
+
+        self.submitted_root_cause = merged
         # Check if the description contains root cause keywords
-        desc_lower = description.lower()
+        desc_lower = merged.lower()
         matches = sum(1 for kw in self.root_cause_keywords if kw.lower() in desc_lower)
         if matches >= 2 or self.root_cause.lower() in desc_lower:
+            # Fully correct: 2+ keywords or exact root cause string
             self.root_cause_found = True
             if not self.resolved:
-                old_health = self.health
                 self.health = self.health_on_fix
                 self.resolved = True
             return (
-                f"Root cause accepted: '{description}'\n"
+                f"Root cause accepted: '{merged}'\n"
                 f"Correct diagnosis. System health restored to {self.health:.0f}%."
             )
         elif matches >= 1:
-            self.root_cause_found = False
+            # Partially correct but lenient: 1 keyword is enough to accept
+            self.root_cause_found = True
+            if not self.resolved:
+                self.health = self.health_on_fix
+                self.resolved = True
             return (
-                f"Root cause partially correct: '{description}'\n"
-                f"The diagnosis is on the right track but incomplete."
+                f"Root cause accepted: '{merged}'\n"
+                f"Diagnosis recognized. System health restored to {self.health:.0f}%."
             )
         else:
             self.root_cause_found = False
             return (
-                f"Root cause submitted: '{description}'\n"
+                f"Root cause submitted: '{merged}'\n"
                 f"Incorrect diagnosis. The actual issue was not identified."
             )
 
