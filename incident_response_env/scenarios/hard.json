@@ -8,7 +8,7 @@
     "optimal_steps": 7,
     "root_cause": "crypto_mining_attack",
     "root_cause_service": "payment-service",
-    "root_cause_keywords": ["crypto", "mining", "attack", "malware", "xmrig", "malicious", "security", "breach", "payment-service"],
+    "root_cause_keywords": ["crypto", "mining", "attack", "malware", "malicious", "security", "breach", "payment-service", "unauthorized"],
     "fix_action": "submit_root_cause",
     "fix_target": "payment-service",
     "special_fix": "kill_malicious_process",
@@ -18,8 +18,7 @@
       {"service": "payment-service", "alert_type": "cpu_spike", "severity": "critical", "message": "CPU sustained at 97% for 15 minutes"},
       {"service": "payment-service", "alert_type": "memory_high", "severity": "critical", "message": "Memory usage at 91% and climbing"},
       {"service": "frontend", "alert_type": "high_latency", "severity": "warning", "message": "Payment processing latency at 12,000ms"},
-      {"service": "api-gateway", "alert_type": "upstream_timeout", "severity": "warning", "message": "payment-service timing out on 85% of requests"},
-      {"service": "payment-service", "alert_type": "unusual_network", "severity": "info", "message": "Unusual outbound traffic detected to external IP"}
+      {"service": "api-gateway", "alert_type": "upstream_timeout", "severity": "warning", "message": "payment-service timing out on 85% of requests"}
     ],
     "services": {
       "payment-service": {
@@ -31,22 +30,25 @@
           "[2026-03-25T14:00:05Z] WARN   Response time degraded: 120ms -> 12,000ms",
           "[2026-03-25T14:00:08Z] INFO   Active payment transactions: 3 (normal load)",
           "[2026-03-25T14:00:10Z] WARN   Memory usage climbing: 3.64GB / 4.0GB",
-          "[2026-03-25T14:00:12Z] INFO   Spawned child process PID 9821 at 2026-03-25T13:42:00Z",
-          "[2026-03-25T14:00:15Z] DEBUG  Outbound connection established to 45.33.32.156:4444",
+          "[2026-03-25T14:00:12Z] INFO   Child process PID 9821 started at 2026-03-25T13:42:00Z",
+          "[2026-03-25T14:00:15Z] INFO   Connection pool status: 45 active, 155 idle",
           "[2026-03-25T14:00:18Z] WARN   GC pressure increasing due to memory constraint"
         ],
         "metrics": {"cpu": 97, "memory": 91, "disk": 25, "latency_ms": 12000, "connections": 45, "max_connections": 200},
         "processes": [
           "PID 1      node payment.js               4.2% CPU   380MB RAM",
-          "PID 9821   ./xmrig --donate-level 0      93.1% CPU  3280MB RAM",
-          "PID 50     nginx                          0.3% CPU   15MB RAM"
+          "PID 412    node payment-scheduler.js      0.8% CPU    45MB RAM",
+          "PID 9821   payment-worker-2              93.1% CPU  3280MB RAM",
+          "PID 50     nginx                          0.3% CPU    15MB RAM",
+          "PID 88     node healthcheck.js            0.1% CPU    12MB RAM"
         ],
         "network": [
           "LISTEN      0.0.0.0:8082  (payment-service)",
           "ESTABLISHED 10.0.1.7:8082 -> 10.0.1.10:5432  (database-primary)",
           "ESTABLISHED 10.0.1.7:8082 -> 10.0.1.8:8080   (api-gateway)",
-          "ESTABLISHED 10.0.1.7:44892 -> 45.33.32.156:4444  (EXTERNAL - UNKNOWN)",
-          "ESTABLISHED 10.0.1.7:44893 -> 185.220.101.34:3333  (EXTERNAL - UNKNOWN)"
+          "ESTABLISHED 10.0.1.7:8082 -> 10.0.1.9:6379   (cache-redis)",
+          "ESTABLISHED 10.0.1.7:44892 -> 45.33.32.156:4444",
+          "ESTABLISHED 10.0.1.7:44893 -> 185.220.101.34:3333"
         ]
       },
       "frontend": {
@@ -109,7 +111,7 @@
     },
     "health_on_fix": 90,
     "health_on_restart": 70,
-    "notes": "If agent simply restarts payment-service, health temporarily improves to 70 but the xmrig process respawns within 3 steps. Agent must use check_process_list to discover the malicious PID and check_network to confirm external C2 connections. The correct diagnosis is a security breach, not a performance issue."
+    "notes": "Process name is disguised as payment-worker-2 (looks like a legit worker). External connections show raw IPs with no labels. Agent must notice: 1) payment-worker-2 using 93% CPU but only 3 transactions active, 2) two outbound connections to unknown external IPs on unusual ports (4444, 3333), 3) PID 9821 started at an odd time and is not part of the normal process tree."
   },
   {
     "id": "hard_cascading_config",
@@ -138,8 +140,7 @@
           "[2026-03-25T14:48:00Z] INFO   Config push v4.1.0 initiated by deploy-bot",
           "[2026-03-25T14:48:05Z] INFO   Distributing new sidecar TLS certificates to all services",
           "[2026-03-25T14:48:10Z] INFO   Push completed to 6/6 services",
-          "[2026-03-25T14:48:12Z] INFO   Config version v4.1.0 active across cluster",
-          "[2026-03-25T14:48:15Z] INFO   Previous version: v4.0.9 (rollback available)"
+          "[2026-03-25T14:48:12Z] INFO   Config version v4.1.0 active across cluster"
         ],
         "metrics": {"cpu": 8, "memory": 25, "disk": 15, "latency_ms": 5, "connections": 12, "max_connections": 50},
         "processes": [
@@ -220,7 +221,7 @@
       "cache-redis": []
     },
     "health_on_fix": 88,
-    "notes": "The config-server itself appears healthy (status=healthy, green metrics). The trap is that all alerts point to downstream services. Agent must trace the common pattern (all TLS failures started at the same time) and correlate with the config-server deployment log to identify the root cause. Simply restarting individual services won't help because they'll load the same bad config."
+    "notes": "The config-server itself appears healthy (status=healthy, green metrics). No rollback hint in logs. The trap is that all alerts point to downstream services. Agent must trace the common pattern (all TLS failures started at the same time) and correlate with the config-server deployment log to identify the root cause. Simply restarting individual services won't help because they'll load the same bad config."
   },
   {
     "id": "hard_ddos_vs_traffic",
@@ -246,12 +247,13 @@
         "status": "critical",
         "healthy": false,
         "logs": [
-          "[2026-03-25T16:00:00Z] WARN   Traffic spike detected: 50,000 req/sec",
-          "[2026-03-25T16:00:02Z] WARN   Unique source IPs: 12,847 in last 60 seconds",
-          "[2026-03-25T16:00:05Z] INFO   Top requesting IPs all from ASN 174, 3356, 7018 (Tier-1 transit)",
-          "[2026-03-25T16:00:08Z] WARN   Request pattern analysis: 94% requests to /api/search with random params",
-          "[2026-03-25T16:00:10Z] WARN   Average request size: 43 bytes. No payload variation.",
-          "[2026-03-25T16:00:12Z] INFO   Geographic distribution: 89% from 3 countries (unusual)",
+          "[2026-03-25T16:00:00Z] WARN   Traffic spike detected: 50,000 req/sec (baseline: 2,000/sec)",
+          "[2026-03-25T16:00:02Z] INFO   Unique source IPs in last 60s: 12,847",
+          "[2026-03-25T16:00:04Z] INFO   Top requesting IP ranges: 198.51.100.0/24, 203.0.113.0/24, 192.0.2.0/24",
+          "[2026-03-25T16:00:06Z] INFO   Request breakdown: /api/search 47,120 req/sec, /api/users 1,450 req/sec, / 1,430 req/sec",
+          "[2026-03-25T16:00:08Z] INFO   Average request payload size: 43 bytes",
+          "[2026-03-25T16:00:10Z] INFO   User-Agent distribution: 78% identical UA string 'Mozilla/5.0 (compatible)'",
+          "[2026-03-25T16:00:12Z] WARN   Geographic distribution: 89% of traffic from 3 ASNs",
           "[2026-03-25T16:00:15Z] ERROR  Connection pool exhausted. Dropping connections."
         ],
         "metrics": {"cpu": 99, "memory": 85, "disk": 30, "latency_ms": 25000, "connections": 500, "max_connections": 500},
@@ -274,8 +276,8 @@
         "healthy": false,
         "logs": [
           "[2026-03-25T16:00:03Z] ERROR  Max connections reached: 500/500",
-          "[2026-03-25T16:00:05Z] ERROR  Dropping 48,000 requests/sec",
-          "[2026-03-25T16:00:08Z] WARN   Legitimate traffic being dropped alongside attack traffic"
+          "[2026-03-25T16:00:05Z] ERROR  Dropping incoming requests due to capacity",
+          "[2026-03-25T16:00:08Z] WARN   Both legitimate and excess traffic being dropped"
         ],
         "metrics": {"cpu": 92, "memory": 78, "disk": 28, "latency_ms": 15000, "connections": 500, "max_connections": 500},
         "processes": [
@@ -290,9 +292,9 @@
         "status": "degraded",
         "healthy": true,
         "logs": [
-          "[2026-03-25T16:00:05Z] WARN   Read query surge: 8,000 queries/sec",
-          "[2026-03-25T16:00:08Z] WARN   CPU at 88% from search query flood",
-          "[2026-03-25T16:00:10Z] INFO   All queries are SELECT on 'search' table with random params"
+          "[2026-03-25T16:00:05Z] WARN   Read query surge: 8,000 queries/sec (normal: 200/sec)",
+          "[2026-03-25T16:00:08Z] WARN   CPU at 88% from query volume increase",
+          "[2026-03-25T16:00:10Z] INFO   Query pattern: repeated SELECT on 'search' table with varying parameters"
         ],
         "metrics": {"cpu": 88, "memory": 70, "disk": 60, "latency_ms": 450, "connections": 180, "max_connections": 200},
         "processes": [
@@ -311,6 +313,6 @@
       "cache-redis": []
     },
     "health_on_fix": 85,
-    "notes": "Key clues that this is a DDoS (not legitimate traffic): 1) 94% of requests hit the same endpoint with random params (not organic browsing), 2) average request size is tiny and uniform (bot signature), 3) 89% traffic from only 3 countries, 4) 12,847 source IPs but concentrated in 3 subnets (botnet). Agent must check network connections and logs to distinguish from legitimate viral traffic. Scaling up won't help with DDoS - rate limiting is the correct action."
+    "notes": "Clues spread across logs and network: 1) /api/search receives 94% of traffic while other endpoints are normal, 2) 43-byte uniform request size, 3) 78% identical user-agent, 4) 89% traffic from 3 ASNs, 5) 3 subnets dominate connections. Agent must read logs AND check network to piece together the DDoS pattern. No single log line spells it out."
   }
 ]
