@@ -18,6 +18,12 @@ env = SREEnvironment()
 app = create_fastapi_app(env, SREAction, SREObservation)
 
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for container orchestration and evaluator."""
+    return {"status": "ok", "environment": "incident-response-env", "version": "1.0.0"}
+
+
 @app.get("/tasks")
 async def get_tasks():
     """Return list of available tasks with descriptions and action schema."""

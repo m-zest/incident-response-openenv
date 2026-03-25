@@ -1,4 +1,4 @@
-# 🚨 Incident Response SRE Environment
+# Incident Response SRE Environment
 
 **An On-Call Site Reliability Engineering Simulator for OpenEnv**
 
@@ -8,13 +8,13 @@
 
 An OpenEnv-compatible reinforcement learning environment that simulates production infrastructure incidents. An AI agent acts as an on-call SRE engineer, triaging alerts, diagnosing root causes, and executing remediations across a simulated microservices cluster.
 
-Built for the [OpenEnv AI Hackathon](https://pytorch.org/event/openenv-ai-hackathon/) (Meta × Hugging Face × PyTorch).
+Built for the [OpenEnv AI Hackathon](https://pytorch.org/event/openenv-ai-hackathon/) (Meta x Hugging Face x PyTorch).
 
 ---
 
 ## Why This Environment?
 
-Every production system fails. When it does, a human engineer must rapidly triage alerts, investigate logs, trace dependency chains, and execute the correct fix — often under pressure and with incomplete information.
+Every production system fails. When it does, a human engineer must rapidly triage alerts, investigate logs, trace dependency chains, and execute the correct fix -- often under pressure and with incomplete information.
 
 This environment captures that challenge as a standardized RL benchmark:
 
@@ -46,7 +46,7 @@ The environment simulates a microservices architecture with interconnected servi
 | `config-server` | Service mesh configuration |
 | `dns-resolver` | Internal DNS resolution |
 
-Services have dependency relationships. A failure in `database-primary` cascades through `user-service` → `api-gateway` → `frontend`.
+Services have dependency relationships. A failure in `database-primary` cascades through `user-service` -> `api-gateway` -> `frontend`.
 
 ### Action Space
 
@@ -77,23 +77,23 @@ Each step returns:
 
 ---
 
-## Tasks (Easy → Medium → Hard)
+## Tasks (Easy -> Medium -> Hard)
 
-### Task 1: Easy — Single Alert Triage
+### Task 1: Easy -- Single Alert Triage
 One service has a clear, isolated issue. The agent diagnoses and fixes it in 2-3 steps.
 
 **Scenarios**: Disk full, process crash, failed deployment, memory leak, expired TLS certificate
 
 **Expected agent performance**: ~0.85-0.95
 
-### Task 2: Medium — Correlated Multi-Service Failure
+### Task 2: Medium -- Correlated Multi-Service Failure
 Multiple alerts fire simultaneously. The agent must trace the dependency chain to find the actual root cause, which is often 2-3 layers deep.
 
 **Scenarios**: Database connection pool exhaustion, Redis cache eviction storm, message queue backlog, DNS resolution failure
 
 **Expected agent performance**: ~0.40-0.60
 
-### Task 3: Hard — Cascading Failure with Security Ambiguity
+### Task 3: Hard -- Cascading Failure with Security Ambiguity
 Complex incidents where the root cause is ambiguous. The agent must distinguish between infrastructure failures and active security breaches using diagnostic tools.
 
 **Scenarios**: Crypto-mining attack disguised as memory leak, cascading TLS failure from corrupted config push, DDoS attack vs legitimate traffic spike
@@ -102,21 +102,21 @@ Complex incidents where the root cause is ambiguous. The agent must distinguish 
 
 ---
 
-## Scoring & Grading Logic
+## Scoring and Grading Logic
 
-The grading formula is fully deterministic — no LLM-as-judge, no subjectivity:
+The grading formula is fully deterministic -- no LLM-as-judge, no subjectivity:
 
 ```
-S = max(0, (H_final - H_initial) / (100 - H_initial) × Ω - Φ - Ψ)
+S = max(0, (H_final - H_initial) / (100 - H_initial) * omega - phi - psi)
 ```
 
 | Variable | Description |
 |----------|-------------|
 | `H_initial` | System health at episode start |
 | `H_final` | System health at episode end |
-| `Ω` (omega) | 1.0 if root cause correctly identified, 0.6 if fixed without diagnosis, 0.3 otherwise |
-| `Φ` (phi) | Efficiency penalty: 0.02 per step beyond optimal (max 0.3) |
-| `Ψ` (psi) | Destructive action penalty: 0.15 per occurrence |
+| `omega` | 1.0 if root cause correctly identified, 0.6 if fixed without diagnosis, 0.3 otherwise |
+| `phi` | Efficiency penalty: 0.02 per step beyond optimal (max 0.3) |
+| `psi` | Destructive action penalty: 0.15 per occurrence |
 
 ### Partial Rewards Per Step
 
@@ -129,11 +129,11 @@ S = max(0, (H_final - H_initial) / (100 - H_initial) × Ω - Φ - Ψ)
 | Correct root cause submission | +0.30 | Diagnostic bonus |
 | Wrong root cause submission | -0.10 | Incorrect diagnosis penalty |
 
-### Why "Shotgun Debugging" Fails
+### Why Shotgun Debugging Fails
 
 An agent that blindly restarts every service will:
 - Fix the root cause eventually (+health)
-- But accumulate massive efficiency penalties (-Φ)
+- But accumulate massive efficiency penalties (-phi)
 - And penalties for restarting healthy services (-0.05 each)
 - Final score: ~0.35 instead of ~0.90
 
@@ -141,7 +141,7 @@ The environment rewards **precision and calibrated restraint**.
 
 ---
 
-## Setup & Usage
+## Setup and Usage
 
 ### Prerequisites
 
@@ -153,17 +153,14 @@ The environment rewards **precision and calibrated restraint**.
 
 ```bash
 # Clone the repository
-git clone https://github.com/m-zest/incident-response-env.git
-cd incident-response-env
+git clone https://github.com/m-zest/incident-response-openenv.git
+cd incident-response-openenv
 
 # Install dependencies
 pip install -e ".[dev]"
 
 # Run the server locally
 uvicorn incident_response_env.server.app:app --host 0.0.0.0 --port 8000
-
-# Open the web interface
-# http://localhost:8000/web
 ```
 
 ### Run Tests
@@ -176,7 +173,7 @@ pytest tests/ -v
 
 ```bash
 # Build
-docker build -t incident-response-env:latest -f server/Dockerfile .
+docker build -t incident-response-env:latest .
 
 # Run
 docker run -p 8000:8000 incident-response-env:latest
@@ -236,14 +233,14 @@ python baseline.py
 ### Architecture
 
 ```
-┌─────────────────────────────┐        ┌──────────────────────────────────┐
-│  Agent (LLM / RL Policy)    │        │  Docker Container (HF Spaces)    │
-│                             │  WS    │                                  │
-│  obs = env.reset("medium")  │◄──────►│  environment.py                  │
-│  obs = env.step(action)     │        │    └─ infrastructure.py          │
-│                             │        │    └─ grader.py                  │
-│  Groq / Nemotron / OpenAI   │        │    └─ scenarios/*.json           │
-└─────────────────────────────┘        └──────────────────────────────────┘
++-----------------------------+        +----------------------------------+
+|  Agent (LLM / RL Policy)    |        |  Docker Container (HF Spaces)    |
+|                             |  WS    |                                  |
+|  obs = env.reset("medium")  |<------>|  environment.py                  |
+|  obs = env.step(action)     |        |    +-- infrastructure.py         |
+|                             |        |    +-- grader.py                 |
+|  Groq / Nemotron / OpenAI   |        |    +-- scenarios/*.json          |
++-----------------------------+        +----------------------------------+
 ```
 
 ### Key Design Decisions
@@ -254,7 +251,7 @@ python baseline.py
 
 3. **Server-side state**: The environment maintains full state via WebSocket. The agent never needs to resend history.
 
-4. **Calibrated restraint scoring**: Penalizes agents for acting on insufficient evidence — the same skill required of real SRE engineers.
+4. **Calibrated restraint scoring**: Penalizes agents for acting on insufficient evidence -- the same skill required of real SRE engineers.
 
 5. **Cross-domain tasks**: Hard scenarios blend SRE and cybersecurity, testing whether agents can pivot between operational domains.
 
@@ -263,39 +260,37 @@ python baseline.py
 ## Project Structure
 
 ```
-incident-response-env/
-├── __init__.py                 # Package exports
-├── models.py                   # Pydantic Action, Observation, State
-├── client.py                   # OpenEnv client (SREEnv)
-├── baseline.py                 # LLM baseline inference script
-├── openenv.yaml                # Environment manifest
-├── pyproject.toml              # Dependencies
-├── README.md                   # This file
-├── scenarios/
-│   ├── easy.json               # 5 single-alert scenarios
-│   ├── medium.json             # 4 correlated-failure scenarios
-│   └── hard.json               # 3 cascading/security scenarios
-├── server/
-│   ├── __init__.py
-│   ├── app.py                  # FastAPI server + extra endpoints
-│   ├── environment.py          # Core OpenEnv Environment class
-│   ├── infrastructure.py       # Simulated cluster engine
-│   ├── grader.py               # Deterministic scoring logic
-│   ├── requirements.txt        # Docker dependencies
-│   └── Dockerfile              # Container definition
-└── tests/
-    ├── __init__.py
-    └── test_environment.py     # Grader determinism + integration tests
+incident-response-openenv/
+├── incident_response_env/         # Python package
+│   ├── __init__.py                # Package exports
+│   ├── models.py                  # Pydantic Action, Observation, State
+│   ├── client.py                  # OpenEnv client (SREEnv)
+│   ├── scenarios/
+│   │   ├── easy.json              # 5 single-alert scenarios
+│   │   ├── medium.json            # 4 correlated-failure scenarios
+│   │   └── hard.json              # 3 cascading/security scenarios
+│   └── server/
+│       ├── __init__.py
+│       ├── app.py                 # FastAPI server + extra endpoints
+│       ├── environment.py         # Core OpenEnv Environment class
+│       ├── infrastructure.py      # Simulated cluster engine
+│       └── grader.py              # Deterministic scoring logic
+├── tests/
+│   └── test_environment.py        # Grader determinism + integration tests
+├── baseline.py                    # LLM baseline inference script
+├── Dockerfile                     # Container definition
+├── requirements.txt               # Docker dependencies
+├── openenv.yaml                   # Environment manifest
+├── pyproject.toml                 # Build configuration
+├── README.md                      # This file
+└── LICENSE                        # MIT
 ```
 
 ---
 
 ## Author
 
-**Mohammad Zeeshan** — AI researcher at HUN-REN SZTAKI AI Lab (EU Horizon Europe PROACTIF project), studying adversarial attack surfaces in distributed AI systems. PhD candidate in AI Technical Assessment and Security at Óbuda University.
-
-- GitHub: [m-zest](https://github.com/m-zest)
-- Email: zeeshanm8313@gmail.com
+**Mohammad Zeeshan** -- AI Researcher
 
 ---
 
