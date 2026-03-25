@@ -159,6 +159,9 @@ cd incident-response-openenv
 # Install dependencies
 pip install -e ".[dev]"
 
+# Copy the environment template and fill in your API keys
+cp .env.example .env
+
 # Run the server locally
 uvicorn incident_response_env.server.app:app --host 0.0.0.0 --port 8000
 ```
@@ -278,6 +281,7 @@ incident-response-openenv/
 ├── tests/
 │   └── test_environment.py        # Grader determinism + integration tests
 ├── baseline.py                    # LLM baseline inference script
+├── .env.example                   # Environment variable template
 ├── Dockerfile                     # Container definition
 ├── requirements.txt               # Docker dependencies
 ├── openenv.yaml                   # Environment manifest
