@@ -204,9 +204,6 @@ class SREEnvironment(Environment):
         elif self._state.step_count >= self._state.max_steps:
             episode_done = True
             output += "\n\nMAX STEPS REACHED. Episode ending."
-        elif self._cluster.resolved and self._cluster.health >= 90:
-            episode_done = True
-            output += "\n\nSystem fully restored. Episode complete."
 
         self._state.done = episode_done
 
