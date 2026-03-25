@@ -87,7 +87,7 @@ Example 6 — submit security root cause:
 
 def parse_action(response_text: str) -> SREAction:
     """Parse LLM response into an SREAction."""
-    text = response_text.strip()
+    text = (response_text or "").strip()
 
     # Try to extract JSON from the response
     # Handle cases where LLM wraps JSON in markdown code blocks
