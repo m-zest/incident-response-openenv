@@ -174,6 +174,14 @@ class SREEnvironment(Environment):
         # Apply time-based effects (e.g., malware respawning)
         self._cluster.tick()
 
+        # Nudge agent to submit diagnosis after a successful fix
+        if (action.command in ("restart_service", "rollback_deploy", "scale_up")
+                and self._cluster.health >= 85 and self._cluster.resolved):
+            output += (
+                "\n\nSystem restored. Submit your root cause diagnosis with: "
+                "submit_root_cause {description}"
+            )
+
         # Update state from cluster
         self._state.current_health = self._cluster.health
         self._state.root_cause_found = self._cluster.root_cause_found
@@ -209,6 +217,14 @@ class SREEnvironment(Environment):
 
         # Compute final score if done
         if episode_done:
+            # If agent fixed the system but ran out of steps without
+            # submitting root cause, give partial credit (omega=0.8)
+            timed_out_resolved = (
+                self._state.step_count >= self._state.max_steps
+                and self._cluster.resolved
+                and self._cluster.health >= 85
+                and not self._state.root_cause_found
+            )
             final_score = compute_final_score(
                 initial_health=self._state.initial_health,
                 final_health=self._state.current_health,
@@ -218,6 +234,7 @@ class SREEnvironment(Environment):
                 optimal_steps=self._state.optimal_steps,
                 destructive_actions=self._state.destructive_actions,
                 resolved=self._cluster.resolved,
+                timed_out_resolved=timed_out_resolved,
             )
             self._state.cumulative_reward = final_score
 
