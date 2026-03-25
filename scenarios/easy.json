@@ -1,0 +1,272 @@
+[
+  {
+    "id": "easy_disk_full",
+    "name": "Disk Full on Log Server",
+    "description": "A storage node has run out of disk space due to unrotated log files.",
+    "initial_health": 55,
+    "max_steps": 10,
+    "optimal_steps": 2,
+    "root_cause": "disk_full",
+    "root_cause_service": "log-server",
+    "root_cause_keywords": ["disk", "full", "storage", "space", "log-server"],
+    "fix_action": "restart_service",
+    "fix_target": "log-server",
+    "alerts": [
+      {"service": "log-server", "alert_type": "disk_usage_critical", "severity": "critical", "message": "Disk usage at 98% on /var/log partition"}
+    ],
+    "services": {
+      "log-server": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T08:12:01Z] ERROR  Disk usage at 98% on /var/log",
+          "[2026-03-25T08:12:05Z] ERROR  Failed to write to /var/log/app.log: No space left on device",
+          "[2026-03-25T08:12:08Z] WARN   Log rotation last executed 47 days ago",
+          "[2026-03-25T08:12:10Z] ERROR  Cannot create new log segment: ENOSPC",
+          "[2026-03-25T08:12:15Z] INFO   /var/log consuming 94GB of 96GB total"
+        ],
+        "metrics": {"cpu": 12, "memory": 35, "disk": 98, "latency_ms": 8, "connections": 15, "max_connections": 100},
+        "processes": [
+          "PID 1    systemd         0.1% CPU   12MB RAM",
+          "PID 204  rsyslog         2.3% CPU   45MB RAM",
+          "PID 891  logrotate       0.0% CPU   8MB RAM  (inactive)"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:514   (rsyslog)",
+          "ESTABLISHED  10.0.1.2:514 -> 10.0.1.5:43210  (frontend)",
+          "ESTABLISHED  10.0.1.2:514 -> 10.0.1.8:43211  (api-gateway)"
+        ]
+      },
+      "frontend": {
+        "status": "healthy",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T08:12:00Z] INFO   Request processed in 45ms",
+          "[2026-03-25T08:12:02Z] INFO   Serving static assets",
+          "[2026-03-25T08:12:04Z] INFO   Health check passed"
+        ],
+        "metrics": {"cpu": 18, "memory": 42, "disk": 35, "latency_ms": 45, "connections": 120, "max_connections": 500},
+        "processes": [
+          "PID 1    node          18.2% CPU  420MB RAM",
+          "PID 15   nginx          1.1% CPU   32MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:3000  (node)",
+          "LISTEN    0.0.0.0:80    (nginx)",
+          "ESTABLISHED  10.0.1.5:3000 -> 10.0.1.8:8080  (api-gateway)"
+        ]
+      }
+    },
+    "dependencies": {
+      "frontend": ["api-gateway"],
+      "api-gateway": ["user-service", "payment-service"],
+      "user-service": ["cache-redis", "database-primary"],
+      "payment-service": ["database-primary"],
+      "log-server": []
+    },
+    "health_on_fix": 95
+  },
+  {
+    "id": "easy_service_crash",
+    "name": "Worker Queue Process Crash",
+    "description": "The background worker process has crashed with an unhandled exception.",
+    "initial_health": 60,
+    "max_steps": 10,
+    "optimal_steps": 2,
+    "root_cause": "process_crash",
+    "root_cause_service": "worker-queue",
+    "root_cause_keywords": ["crash", "worker", "process", "exit", "exception", "worker-queue"],
+    "fix_action": "restart_service",
+    "fix_target": "worker-queue",
+    "alerts": [
+      {"service": "worker-queue", "alert_type": "process_down", "severity": "critical", "message": "Worker process exited with code 1. No active consumers on job queue."}
+    ],
+    "services": {
+      "worker-queue": {
+        "status": "down",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T07:55:12Z] INFO   Processing job batch #4821",
+          "[2026-03-25T07:55:14Z] ERROR  Unhandled exception in job processor: MemoryError",
+          "[2026-03-25T07:55:14Z] ERROR  Stack trace: worker.py:142 -> process_batch() -> allocate_buffer()",
+          "[2026-03-25T07:55:14Z] FATAL  Process exiting with code 1",
+          "[2026-03-25T07:55:15Z] INFO   0 active consumers remaining on queue 'jobs'"
+        ],
+        "metrics": {"cpu": 0, "memory": 0, "disk": 22, "latency_ms": 0, "connections": 0, "max_connections": 50},
+        "processes": [],
+        "network": []
+      },
+      "api-gateway": {
+        "status": "healthy",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T07:56:00Z] WARN   Job submission queue backing up: 342 pending",
+          "[2026-03-25T07:56:05Z] INFO   Synchronous endpoints operating normally"
+        ],
+        "metrics": {"cpu": 25, "memory": 50, "disk": 30, "latency_ms": 55, "connections": 200, "max_connections": 500},
+        "processes": [
+          "PID 1    java -jar gateway.jar    25% CPU  512MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8080  (gateway)",
+          "ESTABLISHED  10.0.1.8:8080 -> 10.0.1.5:3000  (frontend)"
+        ]
+      }
+    },
+    "dependencies": {
+      "worker-queue": ["database-primary"],
+      "api-gateway": ["worker-queue", "user-service"]
+    },
+    "health_on_fix": 92
+  },
+  {
+    "id": "easy_bad_deploy",
+    "name": "Failed Deployment on API Gateway",
+    "description": "A recent deployment to the API gateway introduced a bug causing 500 errors.",
+    "initial_health": 50,
+    "max_steps": 10,
+    "optimal_steps": 2,
+    "root_cause": "bad_deployment",
+    "root_cause_service": "api-gateway",
+    "root_cause_keywords": ["deploy", "deployment", "rollback", "version", "api-gateway", "bug"],
+    "fix_action": "rollback_deploy",
+    "fix_target": "api-gateway",
+    "alerts": [
+      {"service": "api-gateway", "alert_type": "error_rate_high", "severity": "critical", "message": "HTTP 500 error rate at 78% (threshold: 5%)"},
+      {"service": "frontend", "alert_type": "upstream_errors", "severity": "warning", "message": "Upstream api-gateway returning 500 errors"}
+    ],
+    "services": {
+      "api-gateway": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T09:00:01Z] INFO   Deployment v3.2.1 started",
+          "[2026-03-25T09:00:15Z] INFO   Deployment v3.2.1 completed successfully",
+          "[2026-03-25T09:00:18Z] ERROR  NullPointerException in RequestHandler.route()",
+          "[2026-03-25T09:00:19Z] ERROR  500 Internal Server Error: /api/users",
+          "[2026-03-25T09:00:20Z] ERROR  500 Internal Server Error: /api/orders",
+          "[2026-03-25T09:00:22Z] ERROR  Error rate 78% over last 60 seconds",
+          "[2026-03-25T09:00:25Z] INFO   Previous stable version: v3.2.0"
+        ],
+        "metrics": {"cpu": 65, "memory": 72, "disk": 30, "latency_ms": 2200, "connections": 450, "max_connections": 500},
+        "processes": [
+          "PID 1    java -jar gateway-3.2.1.jar    65% CPU  720MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8080  (gateway)",
+          "ESTABLISHED  10.0.1.8:8080 -> 10.0.1.10:5432  (database)"
+        ]
+      },
+      "frontend": {
+        "status": "degraded",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T09:00:20Z] ERROR  Upstream returned 500 for GET /api/users",
+          "[2026-03-25T09:00:21Z] WARN   Displaying error page to users"
+        ],
+        "metrics": {"cpu": 15, "memory": 40, "disk": 30, "latency_ms": 2500, "connections": 300, "max_connections": 500},
+        "processes": [
+          "PID 1    node          15% CPU  400MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:3000  (node)",
+          "ESTABLISHED  10.0.1.5:3000 -> 10.0.1.8:8080  (api-gateway)"
+        ]
+      }
+    },
+    "dependencies": {
+      "frontend": ["api-gateway"],
+      "api-gateway": ["user-service", "payment-service", "database-primary"]
+    },
+    "health_on_fix": 93
+  },
+  {
+    "id": "easy_memory_leak",
+    "name": "Memory Leak in User Service",
+    "description": "The user service has a memory leak causing it to consume all available RAM.",
+    "initial_health": 52,
+    "max_steps": 10,
+    "optimal_steps": 2,
+    "root_cause": "memory_leak",
+    "root_cause_service": "user-service",
+    "root_cause_keywords": ["memory", "leak", "oom", "ram", "user-service"],
+    "fix_action": "restart_service",
+    "fix_target": "user-service",
+    "alerts": [
+      {"service": "user-service", "alert_type": "memory_critical", "severity": "critical", "message": "Memory usage at 96% and climbing. OOM kill imminent."}
+    ],
+    "services": {
+      "user-service": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T06:00:00Z] INFO   Memory usage: 2.1GB / 4.0GB",
+          "[2026-03-25T07:00:00Z] INFO   Memory usage: 2.8GB / 4.0GB",
+          "[2026-03-25T08:00:00Z] WARN   Memory usage: 3.4GB / 4.0GB",
+          "[2026-03-25T08:30:00Z] WARN   Memory usage: 3.6GB / 4.0GB - potential leak detected",
+          "[2026-03-25T09:00:00Z] ERROR  Memory usage: 3.84GB / 4.0GB (96%)",
+          "[2026-03-25T09:00:05Z] ERROR  GC unable to reclaim sufficient memory",
+          "[2026-03-25T09:00:10Z] WARN   OOM killer threshold approaching"
+        ],
+        "metrics": {"cpu": 45, "memory": 96, "disk": 25, "latency_ms": 1800, "connections": 180, "max_connections": 200},
+        "processes": [
+          "PID 1    node user-service.js    45% CPU  3840MB RAM",
+          "PID 22   node --inspect          0.5% CPU  12MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8081  (user-service)",
+          "ESTABLISHED  10.0.1.6:8081 -> 10.0.1.9:6379  (cache-redis)",
+          "ESTABLISHED  10.0.1.6:8081 -> 10.0.1.10:5432  (database)"
+        ]
+      }
+    },
+    "dependencies": {
+      "user-service": ["cache-redis", "database-primary"],
+      "api-gateway": ["user-service"]
+    },
+    "health_on_fix": 94
+  },
+  {
+    "id": "easy_cert_expired",
+    "name": "Expired TLS Certificate",
+    "description": "The TLS certificate on the payment service has expired, causing connection failures.",
+    "initial_health": 58,
+    "max_steps": 10,
+    "optimal_steps": 2,
+    "root_cause": "certificate_expired",
+    "root_cause_service": "payment-service",
+    "root_cause_keywords": ["cert", "certificate", "tls", "ssl", "expired", "payment-service"],
+    "fix_action": "restart_service",
+    "fix_target": "payment-service",
+    "alerts": [
+      {"service": "payment-service", "alert_type": "tls_cert_expired", "severity": "critical", "message": "TLS certificate expired 2 hours ago. All HTTPS connections failing."}
+    ],
+    "services": {
+      "payment-service": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T07:00:00Z] ERROR  TLS handshake failed: certificate has expired",
+          "[2026-03-25T07:00:01Z] ERROR  SSL_ERROR_EXPIRED_CERT_ALERT for payment-service.internal:443",
+          "[2026-03-25T07:00:05Z] ERROR  All incoming HTTPS connections rejected",
+          "[2026-03-25T07:00:10Z] INFO   Certificate CN=payment-service.internal expired at 2026-03-25T05:00:00Z",
+          "[2026-03-25T07:00:15Z] INFO   Auto-renewal failed: certbot unable to reach ACME server"
+        ],
+        "metrics": {"cpu": 5, "memory": 30, "disk": 20, "latency_ms": 0, "connections": 0, "max_connections": 200},
+        "processes": [
+          "PID 1    node payment.js    5% CPU  300MB RAM",
+          "PID 50   nginx              0.3% CPU  15MB RAM (TLS termination)"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:443   (nginx - REFUSING connections)",
+          "LISTEN    0.0.0.0:8082  (payment internal)"
+        ]
+      }
+    },
+    "dependencies": {
+      "payment-service": ["database-primary"],
+      "api-gateway": ["payment-service"]
+    },
+    "health_on_fix": 96
+  }
+]

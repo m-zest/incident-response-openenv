@@ -1,0 +1,355 @@
+[
+  {
+    "id": "medium_db_pool_exhaustion",
+    "name": "Database Connection Pool Exhaustion",
+    "description": "Slow queries have exhausted the database connection pool, causing cascading timeouts upstream.",
+    "initial_health": 35,
+    "max_steps": 15,
+    "optimal_steps": 5,
+    "root_cause": "database_connection_pool_exhaustion",
+    "root_cause_service": "database-primary",
+    "root_cause_keywords": ["database", "connection", "pool", "exhaustion", "slow query", "database-primary"],
+    "fix_action": "restart_service",
+    "fix_target": "database-primary",
+    "alerts": [
+      {"service": "frontend", "alert_type": "high_latency", "severity": "warning", "message": "P99 latency at 8500ms (threshold: 500ms)"},
+      {"service": "api-gateway", "alert_type": "error_rate_high", "severity": "critical", "message": "HTTP 500 error rate at 45%"},
+      {"service": "user-service", "alert_type": "connection_timeout", "severity": "critical", "message": "Database connection timeout after 30s"}
+    ],
+    "services": {
+      "frontend": {
+        "status": "degraded",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T10:15:00Z] WARN   Upstream api-gateway response time: 8200ms",
+          "[2026-03-25T10:15:02Z] ERROR  Request timeout for GET /dashboard after 30s",
+          "[2026-03-25T10:15:05Z] WARN   Displaying degraded experience to users",
+          "[2026-03-25T10:15:08Z] INFO   Static assets serving normally",
+          "[2026-03-25T10:15:10Z] WARN   User complaints increasing: 47 tickets in last 5 min"
+        ],
+        "metrics": {"cpu": 22, "memory": 48, "disk": 30, "latency_ms": 8500, "connections": 280, "max_connections": 500},
+        "processes": [
+          "PID 1    node frontend.js    22% CPU  480MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:3000  (node)",
+          "ESTABLISHED  10.0.1.5:3000 -> 10.0.1.8:8080  (api-gateway)"
+        ]
+      },
+      "api-gateway": {
+        "status": "degraded",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T10:14:55Z] ERROR  Connection refused from user-service:8081",
+          "[2026-03-25T10:14:56Z] WARN   Circuit breaker OPEN for user-service",
+          "[2026-03-25T10:14:58Z] ERROR  500 Internal Server Error: /api/users/profile",
+          "[2026-03-25T10:15:00Z] ERROR  Upstream timeout: user-service did not respond in 30s",
+          "[2026-03-25T10:15:02Z] INFO   payment-service endpoints responding normally"
+        ],
+        "metrics": {"cpu": 35, "memory": 55, "disk": 28, "latency_ms": 8200, "connections": 420, "max_connections": 500},
+        "processes": [
+          "PID 1    java -jar gateway.jar    35% CPU  550MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8080  (gateway)",
+          "ESTABLISHED  10.0.1.8:8080 -> 10.0.1.6:8081  (user-service) TIME_WAIT",
+          "ESTABLISHED  10.0.1.8:8080 -> 10.0.1.7:8082  (payment-service)"
+        ]
+      },
+      "user-service": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T10:14:50Z] ERROR  Cannot acquire database connection from pool",
+          "[2026-03-25T10:14:51Z] ERROR  Connection pool exhausted: 200/200 active connections",
+          "[2026-03-25T10:14:53Z] ERROR  Query timeout after 30s: SELECT * FROM users WHERE...",
+          "[2026-03-25T10:14:55Z] WARN   Thread pool blocked waiting for DB connections",
+          "[2026-03-25T10:14:58Z] ERROR  Rejecting incoming requests: no available connections"
+        ],
+        "metrics": {"cpu": 15, "memory": 60, "disk": 22, "latency_ms": 30000, "connections": 200, "max_connections": 200},
+        "processes": [
+          "PID 1    node user-service.js    15% CPU  600MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8081  (user-service)",
+          "ESTABLISHED  10.0.1.6:8081 -> 10.0.1.10:5432  (database) x200 connections"
+        ]
+      },
+      "database-primary": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T10:14:30Z] WARN   Max connections reached: 200/200",
+          "[2026-03-25T10:14:32Z] WARN   Slow query detected: SELECT * FROM users JOIN orders ON... (12.4s)",
+          "[2026-03-25T10:14:35Z] WARN   Lock contention on table 'orders': 45 waiting threads",
+          "[2026-03-25T10:14:40Z] ERROR  New connection rejected: too many clients already",
+          "[2026-03-25T10:14:45Z] WARN   Autovacuum lagging behind: dead tuples accumulating"
+        ],
+        "metrics": {"cpu": 89, "memory": 82, "disk": 65, "latency_ms": 12400, "connections": 200, "max_connections": 200},
+        "processes": [
+          "PID 1    postgres    89% CPU  3200MB RAM",
+          "PID 120  postgres: autovacuum    8% CPU  120MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:5432  (postgres)",
+          "ESTABLISHED  10.0.1.10:5432 -> 10.0.1.6:* x200 (user-service)"
+        ]
+      },
+      "payment-service": {
+        "status": "healthy",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T10:15:00Z] INFO   Processing payment #89421",
+          "[2026-03-25T10:15:02Z] INFO   Payment completed in 120ms"
+        ],
+        "metrics": {"cpu": 20, "memory": 40, "disk": 18, "latency_ms": 120, "connections": 30, "max_connections": 200},
+        "processes": [
+          "PID 1    node payment.js    20% CPU  400MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8082  (payment)",
+          "ESTABLISHED  10.0.1.7:8082 -> 10.0.1.10:5432  (database)"
+        ]
+      }
+    },
+    "dependencies": {
+      "frontend": ["api-gateway"],
+      "api-gateway": ["user-service", "payment-service"],
+      "user-service": ["database-primary", "cache-redis"],
+      "payment-service": ["database-primary"],
+      "database-primary": [],
+      "cache-redis": []
+    },
+    "health_on_fix": 88
+  },
+  {
+    "id": "medium_cache_failure",
+    "name": "Redis Cache Eviction Storm",
+    "description": "Redis has hit its memory limit and is aggressively evicting keys, causing a cache stampede to the database.",
+    "initial_health": 38,
+    "max_steps": 15,
+    "optimal_steps": 4,
+    "root_cause": "cache_memory_exhaustion",
+    "root_cause_service": "cache-redis",
+    "root_cause_keywords": ["cache", "redis", "eviction", "memory", "cache-redis", "stampede"],
+    "fix_action": "restart_service",
+    "fix_target": "cache-redis",
+    "alerts": [
+      {"service": "cache-redis", "alert_type": "memory_critical", "severity": "critical", "message": "Redis memory at 99.2%. Aggressive eviction policy active."},
+      {"service": "user-service", "alert_type": "high_latency", "severity": "warning", "message": "Cache miss rate at 94%. All reads hitting database."},
+      {"service": "database-primary", "alert_type": "cpu_spike", "severity": "warning", "message": "CPU at 92% due to sudden read surge."}
+    ],
+    "services": {
+      "cache-redis": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T11:00:00Z] WARN   Memory limit reached: 2048MB/2048MB",
+          "[2026-03-25T11:00:01Z] WARN   Eviction policy 'allkeys-lru' active: evicting 1200 keys/sec",
+          "[2026-03-25T11:00:05Z] ERROR  Keyspace shrinking rapidly: 2.1M -> 0.8M keys in 60s",
+          "[2026-03-25T11:00:10Z] WARN   Connected clients: 180. Memory fragmentation ratio: 1.8",
+          "[2026-03-25T11:00:15Z] ERROR  Background save failed: not enough memory for fork"
+        ],
+        "metrics": {"cpu": 78, "memory": 99, "disk": 45, "latency_ms": 85, "connections": 180, "max_connections": 256},
+        "processes": [
+          "PID 1    redis-server *:6379    78% CPU  2048MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:6379  (redis)",
+          "ESTABLISHED  10.0.1.9:6379 -> 10.0.1.6:*  x120 (user-service)",
+          "ESTABLISHED  10.0.1.9:6379 -> 10.0.1.7:*  x60 (payment-service)"
+        ]
+      },
+      "user-service": {
+        "status": "degraded",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T11:00:02Z] WARN   Cache MISS for user:profile:* keys",
+          "[2026-03-25T11:00:03Z] WARN   Cache miss rate: 94% (normal: 5%)",
+          "[2026-03-25T11:00:05Z] INFO   Falling back to database for all reads",
+          "[2026-03-25T11:00:08Z] WARN   Response time degraded: 450ms -> 2800ms"
+        ],
+        "metrics": {"cpu": 30, "memory": 55, "disk": 22, "latency_ms": 2800, "connections": 150, "max_connections": 200},
+        "processes": [
+          "PID 1    node user-service.js    30% CPU  550MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8081  (user-service)",
+          "ESTABLISHED  10.0.1.6:8081 -> 10.0.1.9:6379  (cache-redis)",
+          "ESTABLISHED  10.0.1.6:8081 -> 10.0.1.10:5432  (database)"
+        ]
+      },
+      "database-primary": {
+        "status": "degraded",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T11:00:05Z] WARN   Sudden read surge: 3400 queries/sec (normal: 200/sec)",
+          "[2026-03-25T11:00:08Z] WARN   CPU at 92% due to cache stampede",
+          "[2026-03-25T11:00:10Z] INFO   Connection pool: 160/200 active"
+        ],
+        "metrics": {"cpu": 92, "memory": 75, "disk": 60, "latency_ms": 850, "connections": 160, "max_connections": 200},
+        "processes": [
+          "PID 1    postgres    92% CPU  3000MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:5432  (postgres)",
+          "ESTABLISHED  10.0.1.10:5432 -> 10.0.1.6:*  x120 (user-service)",
+          "ESTABLISHED  10.0.1.10:5432 -> 10.0.1.7:*  x40 (payment-service)"
+        ]
+      }
+    },
+    "dependencies": {
+      "user-service": ["cache-redis", "database-primary"],
+      "payment-service": ["cache-redis", "database-primary"],
+      "cache-redis": [],
+      "database-primary": []
+    },
+    "health_on_fix": 85
+  },
+  {
+    "id": "medium_queue_backlog",
+    "name": "Message Queue Backlog Causing Worker Starvation",
+    "description": "A surge in incoming events has overwhelmed the message queue, causing workers to fall behind and API timeouts.",
+    "initial_health": 40,
+    "max_steps": 15,
+    "optimal_steps": 4,
+    "root_cause": "queue_backlog_overflow",
+    "root_cause_service": "worker-queue",
+    "root_cause_keywords": ["queue", "backlog", "worker", "message", "overflow", "consumer", "worker-queue"],
+    "fix_action": "scale_up",
+    "fix_target": "worker-queue",
+    "alerts": [
+      {"service": "worker-queue", "alert_type": "queue_depth_critical", "severity": "critical", "message": "Queue depth at 45,000 messages (threshold: 1,000). Consumer lag: 8 minutes."},
+      {"service": "api-gateway", "alert_type": "high_latency", "severity": "warning", "message": "Async endpoints timing out. Jobs not completing."},
+      {"service": "frontend", "alert_type": "user_complaints", "severity": "warning", "message": "Users reporting 'processing' state stuck for >5 minutes."}
+    ],
+    "services": {
+      "worker-queue": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T12:00:00Z] WARN   Queue depth: 45,230 messages. Consumer count: 2",
+          "[2026-03-25T12:00:05Z] WARN   Consumer lag: 8 minutes and growing",
+          "[2026-03-25T12:00:10Z] ERROR  Memory pressure from queued messages: 3.2GB held in buffer",
+          "[2026-03-25T12:00:15Z] WARN   Processing rate: 50 msg/sec. Ingest rate: 500 msg/sec",
+          "[2026-03-25T12:00:20Z] INFO   Consumer #1 healthy but overwhelmed. Consumer #2 healthy but overwhelmed."
+        ],
+        "metrics": {"cpu": 85, "memory": 88, "disk": 72, "latency_ms": 480000, "connections": 45, "max_connections": 100},
+        "processes": [
+          "PID 1    rabbitmq-server    45% CPU  3200MB RAM",
+          "PID 200  consumer-worker-1  20% CPU  256MB RAM",
+          "PID 201  consumer-worker-2  20% CPU  256MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:5672  (rabbitmq)",
+          "LISTEN    0.0.0.0:15672  (management)",
+          "ESTABLISHED  10.0.1.11:5672 -> 10.0.1.8:*  (api-gateway publisher)"
+        ]
+      },
+      "api-gateway": {
+        "status": "degraded",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T12:00:00Z] WARN   Async job submissions queuing up",
+          "[2026-03-25T12:00:05Z] ERROR  Job callback timeout: job #78421 still pending after 5 min",
+          "[2026-03-25T12:00:10Z] INFO   Synchronous endpoints healthy"
+        ],
+        "metrics": {"cpu": 30, "memory": 50, "disk": 28, "latency_ms": 200, "connections": 350, "max_connections": 500},
+        "processes": [
+          "PID 1    java -jar gateway.jar    30% CPU  500MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8080  (gateway)",
+          "ESTABLISHED  10.0.1.8:8080 -> 10.0.1.11:5672  (worker-queue)"
+        ]
+      }
+    },
+    "dependencies": {
+      "frontend": ["api-gateway"],
+      "api-gateway": ["worker-queue", "user-service"],
+      "worker-queue": ["database-primary"],
+      "database-primary": []
+    },
+    "health_on_fix": 82
+  },
+  {
+    "id": "medium_dns_failure",
+    "name": "Internal DNS Resolution Failure",
+    "description": "The internal DNS resolver is intermittently failing, causing random connection errors across services.",
+    "initial_health": 42,
+    "max_steps": 15,
+    "optimal_steps": 5,
+    "root_cause": "dns_resolver_failure",
+    "root_cause_service": "dns-resolver",
+    "root_cause_keywords": ["dns", "resolver", "resolution", "lookup", "dns-resolver", "name"],
+    "fix_action": "restart_service",
+    "fix_target": "dns-resolver",
+    "alerts": [
+      {"service": "user-service", "alert_type": "connection_errors", "severity": "critical", "message": "Intermittent DNS resolution failures for database-primary.internal"},
+      {"service": "payment-service", "alert_type": "connection_errors", "severity": "critical", "message": "Intermittent DNS resolution failures for cache-redis.internal"},
+      {"service": "api-gateway", "alert_type": "error_rate_high", "severity": "warning", "message": "Error rate 32% - mixed 503 and 504 errors"}
+    ],
+    "services": {
+      "dns-resolver": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T13:00:00Z] ERROR  Failed to load zone file: corrupted entry at line 847",
+          "[2026-03-25T13:00:02Z] WARN   Falling back to stale cache for 60% of queries",
+          "[2026-03-25T13:00:05Z] ERROR  SERVFAIL for database-primary.internal A record",
+          "[2026-03-25T13:00:08Z] ERROR  SERVFAIL for cache-redis.internal A record",
+          "[2026-03-25T13:00:10Z] INFO   Queries answered from cache: 40%. Queries failed: 60%"
+        ],
+        "metrics": {"cpu": 65, "memory": 40, "disk": 12, "latency_ms": 2500, "connections": 80, "max_connections": 200},
+        "processes": [
+          "PID 1    named (bind9)    65% CPU  400MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:53  (named)",
+          "ESTABLISHED connections from all services"
+        ]
+      },
+      "user-service": {
+        "status": "degraded",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T13:00:03Z] ERROR  DNS lookup failed: database-primary.internal SERVFAIL",
+          "[2026-03-25T13:00:05Z] ERROR  Connection to database failed: name resolution error",
+          "[2026-03-25T13:00:08Z] INFO   Retrying... DNS resolved on attempt 3",
+          "[2026-03-25T13:00:10Z] WARN   Intermittent failures: 60% of requests failing"
+        ],
+        "metrics": {"cpu": 20, "memory": 50, "disk": 22, "latency_ms": 3200, "connections": 80, "max_connections": 200},
+        "processes": [
+          "PID 1    node user-service.js    20% CPU  500MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8081  (user-service)",
+          "ESTABLISHED  10.0.1.6:8081 -> 10.0.1.12:53  (dns-resolver)"
+        ]
+      },
+      "payment-service": {
+        "status": "degraded",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T13:00:04Z] ERROR  DNS lookup failed: cache-redis.internal SERVFAIL",
+          "[2026-03-25T13:00:06Z] WARN   Cache unavailable, falling back to DB-only mode"
+        ],
+        "metrics": {"cpu": 25, "memory": 45, "disk": 20, "latency_ms": 2800, "connections": 40, "max_connections": 200},
+        "processes": [
+          "PID 1    node payment.js    25% CPU  450MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8082  (payment)",
+          "ESTABLISHED  10.0.1.7:8082 -> 10.0.1.12:53  (dns-resolver)"
+        ]
+      }
+    },
+    "dependencies": {
+      "user-service": ["dns-resolver", "database-primary", "cache-redis"],
+      "payment-service": ["dns-resolver", "database-primary", "cache-redis"],
+      "api-gateway": ["dns-resolver", "user-service", "payment-service"],
+      "dns-resolver": []
+    },
+    "health_on_fix": 90
+  }
+]

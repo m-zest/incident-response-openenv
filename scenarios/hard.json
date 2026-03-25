@@ -1,0 +1,316 @@
+[
+  {
+    "id": "hard_crypto_mining",
+    "name": "Crypto-Mining Attack Disguised as Memory Leak",
+    "description": "A malicious crypto-miner has been deployed on the payment service, consuming CPU and causing cascading failures. Restarting the service only temporarily fixes it as the malware auto-restarts.",
+    "initial_health": 25,
+    "max_steps": 20,
+    "optimal_steps": 7,
+    "root_cause": "crypto_mining_attack",
+    "root_cause_service": "payment-service",
+    "root_cause_keywords": ["crypto", "mining", "attack", "malware", "xmrig", "malicious", "security", "breach", "payment-service"],
+    "fix_action": "submit_root_cause",
+    "fix_target": "payment-service",
+    "special_fix": "kill_malicious_process",
+    "restart_temporary": true,
+    "restart_revert_steps": 3,
+    "alerts": [
+      {"service": "payment-service", "alert_type": "cpu_spike", "severity": "critical", "message": "CPU sustained at 97% for 15 minutes"},
+      {"service": "payment-service", "alert_type": "memory_high", "severity": "critical", "message": "Memory usage at 91% and climbing"},
+      {"service": "frontend", "alert_type": "high_latency", "severity": "warning", "message": "Payment processing latency at 12,000ms"},
+      {"service": "api-gateway", "alert_type": "upstream_timeout", "severity": "warning", "message": "payment-service timing out on 85% of requests"},
+      {"service": "payment-service", "alert_type": "unusual_network", "severity": "info", "message": "Unusual outbound traffic detected to external IP"}
+    ],
+    "services": {
+      "payment-service": {
+        "status": "critical",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T14:00:00Z] INFO   Payment processing started for order #94521",
+          "[2026-03-25T14:00:02Z] WARN   CPU usage sustained above 95% for 15 minutes",
+          "[2026-03-25T14:00:05Z] WARN   Response time degraded: 120ms -> 12,000ms",
+          "[2026-03-25T14:00:08Z] INFO   Active payment transactions: 3 (normal load)",
+          "[2026-03-25T14:00:10Z] WARN   Memory usage climbing: 3.64GB / 4.0GB",
+          "[2026-03-25T14:00:12Z] INFO   Spawned child process PID 9821 at 2026-03-25T13:42:00Z",
+          "[2026-03-25T14:00:15Z] DEBUG  Outbound connection established to 45.33.32.156:4444",
+          "[2026-03-25T14:00:18Z] WARN   GC pressure increasing due to memory constraint"
+        ],
+        "metrics": {"cpu": 97, "memory": 91, "disk": 25, "latency_ms": 12000, "connections": 45, "max_connections": 200},
+        "processes": [
+          "PID 1      node payment.js               4.2% CPU   380MB RAM",
+          "PID 9821   ./xmrig --donate-level 0      93.1% CPU  3280MB RAM",
+          "PID 50     nginx                          0.3% CPU   15MB RAM"
+        ],
+        "network": [
+          "LISTEN      0.0.0.0:8082  (payment-service)",
+          "ESTABLISHED 10.0.1.7:8082 -> 10.0.1.10:5432  (database-primary)",
+          "ESTABLISHED 10.0.1.7:8082 -> 10.0.1.8:8080   (api-gateway)",
+          "ESTABLISHED 10.0.1.7:44892 -> 45.33.32.156:4444  (EXTERNAL - UNKNOWN)",
+          "ESTABLISHED 10.0.1.7:44893 -> 185.220.101.34:3333  (EXTERNAL - UNKNOWN)"
+        ]
+      },
+      "frontend": {
+        "status": "degraded",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T14:00:01Z] WARN   Payment page load time: 12,500ms",
+          "[2026-03-25T14:00:05Z] ERROR  User checkout timeout for session #88421",
+          "[2026-03-25T14:00:08Z] WARN   Upstream payment-service latency critical"
+        ],
+        "metrics": {"cpu": 18, "memory": 42, "disk": 30, "latency_ms": 12500, "connections": 200, "max_connections": 500},
+        "processes": [
+          "PID 1    node frontend.js    18% CPU  420MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:3000  (node)",
+          "ESTABLISHED  10.0.1.5:3000 -> 10.0.1.8:8080  (api-gateway)"
+        ]
+      },
+      "api-gateway": {
+        "status": "degraded",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T14:00:02Z] ERROR  Upstream timeout: payment-service (30s)",
+          "[2026-03-25T14:00:05Z] WARN   Circuit breaker HALF-OPEN for payment-service",
+          "[2026-03-25T14:00:08Z] INFO   user-service and other endpoints healthy"
+        ],
+        "metrics": {"cpu": 28, "memory": 50, "disk": 28, "latency_ms": 350, "connections": 380, "max_connections": 500},
+        "processes": [
+          "PID 1    java -jar gateway.jar    28% CPU  500MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8080  (gateway)",
+          "ESTABLISHED  10.0.1.8:8080 -> 10.0.1.7:8082  (payment-service) TIMEOUT"
+        ]
+      },
+      "database-primary": {
+        "status": "healthy",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T14:00:00Z] INFO   Normal operation. 45 active connections.",
+          "[2026-03-25T14:00:05Z] INFO   Query latency normal: avg 12ms"
+        ],
+        "metrics": {"cpu": 25, "memory": 55, "disk": 60, "latency_ms": 12, "connections": 45, "max_connections": 200},
+        "processes": [
+          "PID 1    postgres    25% CPU  2200MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:5432  (postgres)"
+        ]
+      }
+    },
+    "dependencies": {
+      "frontend": ["api-gateway"],
+      "api-gateway": ["user-service", "payment-service"],
+      "payment-service": ["database-primary"],
+      "user-service": ["cache-redis", "database-primary"],
+      "database-primary": [],
+      "cache-redis": []
+    },
+    "health_on_fix": 90,
+    "health_on_restart": 70,
+    "notes": "If agent simply restarts payment-service, health temporarily improves to 70 but the xmrig process respawns within 3 steps. Agent must use check_process_list to discover the malicious PID and check_network to confirm external C2 connections. The correct diagnosis is a security breach, not a performance issue."
+  },
+  {
+    "id": "hard_cascading_config",
+    "name": "Cascading Failure from Corrupted Config Push",
+    "description": "A bad configuration push to the service mesh sidecar has caused cascading TLS failures across the cluster. Services are failing in sequence as they try to communicate.",
+    "initial_health": 20,
+    "max_steps": 20,
+    "optimal_steps": 7,
+    "root_cause": "corrupted_config_push",
+    "root_cause_service": "config-server",
+    "root_cause_keywords": ["config", "configuration", "push", "sidecar", "envoy", "tls", "mesh", "config-server", "rollback"],
+    "fix_action": "rollback_deploy",
+    "fix_target": "config-server",
+    "alerts": [
+      {"service": "user-service", "alert_type": "tls_handshake_failure", "severity": "critical", "message": "TLS handshake failures to database-primary: certificate mismatch"},
+      {"service": "payment-service", "alert_type": "tls_handshake_failure", "severity": "critical", "message": "TLS handshake failures to cache-redis: certificate mismatch"},
+      {"service": "api-gateway", "alert_type": "error_rate_high", "severity": "critical", "message": "Error rate 92% - all downstream services unreachable"},
+      {"service": "frontend", "alert_type": "complete_outage", "severity": "critical", "message": "All API calls failing. Site completely down."},
+      {"service": "config-server", "alert_type": "deployment_completed", "severity": "info", "message": "Config push v4.1.0 completed 12 minutes ago"}
+    ],
+    "services": {
+      "config-server": {
+        "status": "healthy",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T14:48:00Z] INFO   Config push v4.1.0 initiated by deploy-bot",
+          "[2026-03-25T14:48:05Z] INFO   Distributing new sidecar TLS certificates to all services",
+          "[2026-03-25T14:48:10Z] INFO   Push completed to 6/6 services",
+          "[2026-03-25T14:48:12Z] INFO   Config version v4.1.0 active across cluster",
+          "[2026-03-25T14:48:15Z] INFO   Previous version: v4.0.9 (rollback available)"
+        ],
+        "metrics": {"cpu": 8, "memory": 25, "disk": 15, "latency_ms": 5, "connections": 12, "max_connections": 50},
+        "processes": [
+          "PID 1    config-server    8% CPU  250MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8443  (config-server)",
+          "ESTABLISHED connections to all service sidecars"
+        ]
+      },
+      "api-gateway": {
+        "status": "critical",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T14:48:20Z] ERROR  TLS handshake failed to user-service: certificate_unknown",
+          "[2026-03-25T14:48:22Z] ERROR  TLS handshake failed to payment-service: certificate_unknown",
+          "[2026-03-25T14:48:25Z] ERROR  All downstream services unreachable via mTLS",
+          "[2026-03-25T14:48:28Z] WARN   Sidecar proxy received new certificates at 14:48:10",
+          "[2026-03-25T14:48:30Z] ERROR  Error rate: 92%. Zero successful downstream calls."
+        ],
+        "metrics": {"cpu": 15, "memory": 45, "disk": 28, "latency_ms": 30000, "connections": 0, "max_connections": 500},
+        "processes": [
+          "PID 1    java -jar gateway.jar    15% CPU  450MB RAM",
+          "PID 100  envoy-sidecar            5% CPU   120MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8080  (gateway)",
+          "FAILED    10.0.1.8:8080 -> 10.0.1.6:8081  (user-service) TLS_ERROR",
+          "FAILED    10.0.1.8:8080 -> 10.0.1.7:8082  (payment-service) TLS_ERROR"
+        ]
+      },
+      "user-service": {
+        "status": "critical",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T14:48:18Z] ERROR  Sidecar certificate rotated",
+          "[2026-03-25T14:48:20Z] ERROR  TLS handshake to database-primary failed: ERR_CERT_AUTHORITY_INVALID",
+          "[2026-03-25T14:48:22Z] ERROR  Cannot reach cache-redis: mTLS certificate rejected",
+          "[2026-03-25T14:48:25Z] ERROR  All dependent services unreachable"
+        ],
+        "metrics": {"cpu": 10, "memory": 50, "disk": 22, "latency_ms": 30000, "connections": 0, "max_connections": 200},
+        "processes": [
+          "PID 1    node user-service.js    10% CPU  500MB RAM",
+          "PID 80   envoy-sidecar           3% CPU   100MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8081  (user-service)",
+          "FAILED    10.0.1.6:8081 -> 10.0.1.10:5432  (database) TLS_ERROR",
+          "FAILED    10.0.1.6:8081 -> 10.0.1.9:6379   (cache-redis) TLS_ERROR"
+        ]
+      },
+      "payment-service": {
+        "status": "critical",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T14:48:19Z] ERROR  Sidecar certificate rotated",
+          "[2026-03-25T14:48:21Z] ERROR  TLS handshake to database-primary failed",
+          "[2026-03-25T14:48:24Z] ERROR  All database operations failing"
+        ],
+        "metrics": {"cpu": 8, "memory": 40, "disk": 20, "latency_ms": 30000, "connections": 0, "max_connections": 200},
+        "processes": [
+          "PID 1    node payment.js    8% CPU  400MB RAM",
+          "PID 75   envoy-sidecar     3% CPU   100MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8082  (payment-service)",
+          "FAILED    10.0.1.7:8082 -> 10.0.1.10:5432  (database) TLS_ERROR"
+        ]
+      }
+    },
+    "dependencies": {
+      "frontend": ["api-gateway"],
+      "api-gateway": ["user-service", "payment-service"],
+      "user-service": ["database-primary", "cache-redis"],
+      "payment-service": ["database-primary"],
+      "config-server": [],
+      "database-primary": [],
+      "cache-redis": []
+    },
+    "health_on_fix": 88,
+    "notes": "The config-server itself appears healthy (status=healthy, green metrics). The trap is that all alerts point to downstream services. Agent must trace the common pattern (all TLS failures started at the same time) and correlate with the config-server deployment log to identify the root cause. Simply restarting individual services won't help because they'll load the same bad config."
+  },
+  {
+    "id": "hard_ddos_vs_traffic",
+    "name": "DDoS Attack vs Legitimate Traffic Spike",
+    "description": "The frontend is receiving massive traffic. The agent must determine if this is a legitimate viral event or a DDoS attack, and apply the correct mitigation.",
+    "initial_health": 28,
+    "max_steps": 20,
+    "optimal_steps": 6,
+    "root_cause": "ddos_attack",
+    "root_cause_service": "frontend",
+    "root_cause_keywords": ["ddos", "attack", "distributed", "denial", "flood", "botnet", "rate limit", "frontend"],
+    "fix_action": "submit_root_cause",
+    "fix_target": "frontend",
+    "special_fix": "enable_rate_limiting",
+    "alerts": [
+      {"service": "frontend", "alert_type": "traffic_spike", "severity": "critical", "message": "Incoming requests at 50,000/sec (normal: 2,000/sec). 25x increase."},
+      {"service": "frontend", "alert_type": "cpu_critical", "severity": "critical", "message": "CPU at 99%. All cores saturated."},
+      {"service": "api-gateway", "alert_type": "connection_limit", "severity": "critical", "message": "Max connections reached. Dropping new requests."},
+      {"service": "database-primary", "alert_type": "cpu_spike", "severity": "warning", "message": "CPU at 88% from read surge."}
+    ],
+    "services": {
+      "frontend": {
+        "status": "critical",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T16:00:00Z] WARN   Traffic spike detected: 50,000 req/sec",
+          "[2026-03-25T16:00:02Z] WARN   Unique source IPs: 12,847 in last 60 seconds",
+          "[2026-03-25T16:00:05Z] INFO   Top requesting IPs all from ASN 174, 3356, 7018 (Tier-1 transit)",
+          "[2026-03-25T16:00:08Z] WARN   Request pattern analysis: 94% requests to /api/search with random params",
+          "[2026-03-25T16:00:10Z] WARN   Average request size: 43 bytes. No payload variation.",
+          "[2026-03-25T16:00:12Z] INFO   Geographic distribution: 89% from 3 countries (unusual)",
+          "[2026-03-25T16:00:15Z] ERROR  Connection pool exhausted. Dropping connections."
+        ],
+        "metrics": {"cpu": 99, "memory": 85, "disk": 30, "latency_ms": 25000, "connections": 500, "max_connections": 500},
+        "processes": [
+          "PID 1    node frontend.js    99% CPU  3400MB RAM",
+          "PID 15   nginx              45% CPU  800MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:3000  (node)",
+          "LISTEN    0.0.0.0:80    (nginx)",
+          "ESTABLISHED connections: 500/500 (FULL)",
+          "SYN_RECV backlog: 12,400 pending connections",
+          "Top source: 198.51.100.0/24 (4,200 connections)",
+          "Top source: 203.0.113.0/24 (3,800 connections)",
+          "Top source: 192.0.2.0/24 (3,100 connections)"
+        ]
+      },
+      "api-gateway": {
+        "status": "critical",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T16:00:03Z] ERROR  Max connections reached: 500/500",
+          "[2026-03-25T16:00:05Z] ERROR  Dropping 48,000 requests/sec",
+          "[2026-03-25T16:00:08Z] WARN   Legitimate traffic being dropped alongside attack traffic"
+        ],
+        "metrics": {"cpu": 92, "memory": 78, "disk": 28, "latency_ms": 15000, "connections": 500, "max_connections": 500},
+        "processes": [
+          "PID 1    java -jar gateway.jar    92% CPU  780MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8080  (gateway)",
+          "ESTABLISHED  connections: 500/500 (FULL)"
+        ]
+      },
+      "database-primary": {
+        "status": "degraded",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T16:00:05Z] WARN   Read query surge: 8,000 queries/sec",
+          "[2026-03-25T16:00:08Z] WARN   CPU at 88% from search query flood",
+          "[2026-03-25T16:00:10Z] INFO   All queries are SELECT on 'search' table with random params"
+        ],
+        "metrics": {"cpu": 88, "memory": 70, "disk": 60, "latency_ms": 450, "connections": 180, "max_connections": 200},
+        "processes": [
+          "PID 1    postgres    88% CPU  2800MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:5432  (postgres)"
+        ]
+      }
+    },
+    "dependencies": {
+      "frontend": ["api-gateway"],
+      "api-gateway": ["user-service", "payment-service"],
+      "user-service": ["database-primary", "cache-redis"],
+      "database-primary": [],
+      "cache-redis": []
+    },
+    "health_on_fix": 85,
+    "notes": "Key clues that this is a DDoS (not legitimate traffic): 1) 94% of requests hit the same endpoint with random params (not organic browsing), 2) average request size is tiny and uniform (bot signature), 3) 89% traffic from only 3 countries, 4) 12,847 source IPs but concentrated in 3 subnets (botnet). Agent must check network connections and logs to distinguish from legitimate viral traffic. Scaling up won't help with DDoS - rate limiting is the correct action."
+  }
+]

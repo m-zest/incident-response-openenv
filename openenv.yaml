@@ -1,0 +1,24 @@
+name: incident-response-env
+version: 1.0.0
+description: >
+  On-Call SRE Simulator — A DevSecOps incident response environment where 
+  an AI agent triages alerts, diagnoses root causes, and remediates failures
+  across a simulated microservices cluster. Features 3 difficulty tiers 
+  (easy/medium/hard), deterministic grading, partial reward signals, and 
+  cross-domain reasoning tasks blending reliability engineering with 
+  cybersecurity incident detection.
+author: Mohammad Zeeshan
+author_email: zeeshanm8313@gmail.com
+license: MIT
+tags:
+  - sre
+  - incident-response
+  - devsecops
+  - cybersecurity
+  - infrastructure
+  - real-world
+  - openenv
+entry_point: server.app:app
+client: client:SREEnv
+action_model: models:SREAction
+observation_model: models:SREObservation

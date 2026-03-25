@@ -1,0 +1,27 @@
+[project]
+name = "incident-response-env"
+version = "1.0.0"
+description = "On-Call SRE Simulator — DevSecOps incident response environment for OpenEnv"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Mohammad Zeeshan", email = "zeeshanm8313@gmail.com"}
+]
+dependencies = [
+    "openenv-core>=0.2.1",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "pydantic>=2.0.0",
+    "websockets>=12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "httpx>=0.25.0",
+    "openai>=1.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
