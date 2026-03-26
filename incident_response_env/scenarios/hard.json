@@ -5,7 +5,7 @@
     "description": "A malicious crypto-miner has been deployed on the payment service, consuming CPU and causing cascading failures. Restarting the service only temporarily fixes it as the malware auto-restarts.",
     "initial_health": 25,
     "max_steps": 20,
-    "optimal_steps": 9,
+    "optimal_steps": 12,
     "root_cause": "crypto_mining_attack",
     "root_cause_service": "payment-service",
     "root_cause_keywords": ["crypto", "mining", "attack", "malware", "malicious", "security", "breach", "payment-service", "unauthorized"],
@@ -14,12 +14,16 @@
     "malicious_pid": "9821",
     "special_fix": "kill_malicious_process",
     "restart_temporary": true,
-    "restart_revert_steps": 3,
+    "restart_revert_steps": 2,
     "alerts": [
       {"service": "payment-service", "alert_type": "cpu_spike", "severity": "critical", "message": "CPU sustained at 97% for 15 minutes"},
-      {"service": "payment-service", "alert_type": "memory_high", "severity": "critical", "message": "Memory usage at 91% and climbing"},
+      {"service": "payment-service", "alert_type": "memory_high", "severity": "critical", "message": "Memory usage at 91% and climbing — possible memory leak"},
       {"service": "frontend", "alert_type": "high_latency", "severity": "warning", "message": "Payment processing latency at 12,000ms"},
       {"service": "api-gateway", "alert_type": "upstream_timeout", "severity": "warning", "message": "payment-service timing out on 85% of requests"}
+    ],
+    "noise_alerts": [
+      {"service": "database-primary", "severity": "info", "message": "Routine autovacuum running on payments table", "auto_resolve_after": 3},
+      {"service": "cache-redis", "severity": "warning", "message": "Memory fragmentation ratio 1.4 (threshold 1.5)", "auto_resolve_after": 4}
     ],
     "services": {
       "payment-service": {
@@ -28,23 +32,26 @@
         "logs": [
           "[2026-03-25T14:00:00Z] INFO   Payment processing started for order #94521",
           "[2026-03-25T14:00:02Z] WARN   CPU usage sustained above 95% for 15 minutes",
+          "[2026-03-25T14:00:04Z] INFO   JVM heap: 3.64GB / 4.0GB — GC overhead 42%",
           "[2026-03-25T14:00:05Z] WARN   Response time degraded: 120ms -> 12,000ms",
           "[2026-03-25T14:00:08Z] INFO   Active payment transactions: 3 (normal load)",
           "[2026-03-25T14:00:10Z] WARN   Memory usage climbing: 3.64GB / 4.0GB",
-          "[2026-03-25T14:00:12Z] INFO   Child process PID 9821 started at 2026-03-25T13:42:00Z",
+          "[2026-03-25T14:00:12Z] INFO   Background threads: 14 active (scheduler, batch, gc, retry, health)",
           "[2026-03-25T14:00:15Z] INFO   Connection pool status: 45 active, 155 idle",
-          "[2026-03-25T14:00:18Z] WARN   GC pressure increasing due to memory constraint"
+          "[2026-03-25T14:00:18Z] WARN   GC pressure increasing — consider increasing heap size"
         ],
         "metrics": {"cpu": 97, "memory": 91, "disk": 25, "latency_ms": 12000, "connections": 45, "max_connections": 200},
         "processes": [
           "PID 1      node payment.js               4.2% CPU   380MB RAM",
           "PID 412    node payment-scheduler.js      0.8% CPU    45MB RAM",
           "PID 518    node payment-batch-proc        1.2% CPU    68MB RAM",
-          "PID 9821   [payment-gc-compactor]        93.1% CPU  3280MB RAM",
+          "PID 640    node payment-webhook-handler    0.5% CPU    32MB RAM",
+          "PID 9821   [jvm-gc-thread-4]             93.1% CPU  3280MB RAM",
           "PID 50     nginx                          0.3% CPU    15MB RAM",
           "PID 88     node healthcheck.js            0.1% CPU    12MB RAM",
           "PID 102    node payment-retry-queue       0.4% CPU    28MB RAM",
-          "PID 119    tail -f /var/log/payment.log   0.0% CPU     4MB RAM"
+          "PID 119    tail -f /var/log/payment.log   0.0% CPU     4MB RAM",
+          "PID 205    node payment-audit-logger       0.2% CPU    18MB RAM"
         ],
         "network": [
           "LISTEN      0.0.0.0:8082  (payment-service)",
@@ -52,9 +59,11 @@
           "ESTABLISHED 10.0.1.7:8082  -> 10.0.1.8:8080   (api-gateway)",
           "ESTABLISHED 10.0.1.7:8082  -> 10.0.1.9:6379   (cache-redis)",
           "ESTABLISHED 10.0.1.7:38210 -> 10.0.1.11:5672   (worker-queue)",
+          "ESTABLISHED 10.0.1.7:9090  -> 10.0.1.20:9090   (prometheus-metrics)",
+          "ESTABLISHED 10.0.1.7:8082  -> 10.0.1.5:3000    (frontend)",
           "ESTABLISHED 10.0.1.7:44892 -> 45.33.32.156:4444",
           "ESTABLISHED 10.0.1.7:44893 -> 185.220.101.34:3333",
-          "ESTABLISHED 10.0.1.7:8082  -> 10.0.1.5:3000   (frontend)"
+          "ESTABLISHED 10.0.1.7:443   -> 52.84.12.100:443  (datadog-agent)"
         ]
       },
       "frontend": {
@@ -117,7 +126,7 @@
     },
     "health_on_fix": 90,
     "health_on_restart": 70,
-    "notes": "Process name is disguised as payment-worker-2 (looks like a legit worker). External connections show raw IPs with no labels. Agent must notice: 1) payment-worker-2 using 93% CPU but only 3 transactions active, 2) two outbound connections to unknown external IPs on unusual ports (4444, 3333), 3) PID 9821 started at an odd time and is not part of the normal process tree."
+    "notes": "Malicious process disguised as [jvm-gc-thread-4] among 10 processes. Agent must: 1) check_logs to see normal load vs high CPU, 2) check_process_list to scan 10 processes and spot the 93% CPU one, 3) check_network to find the 2 external IPs (45.33.32.156:4444 and 185.220.101.34:3333) buried among 10 connections including legit monitoring (prometheus, datadog), 4) kill_process requires BOTH check_process_list AND check_network first. Red herring: restart temporarily fixes but malware respawns in 2 steps."
   },
   {
     "id": "hard_cascading_config",
@@ -125,17 +134,20 @@
     "description": "A bad configuration push to the service mesh sidecar has caused cascading TLS failures across the cluster. Services are failing in sequence as they try to communicate.",
     "initial_health": 20,
     "max_steps": 20,
-    "optimal_steps": 10,
+    "optimal_steps": 12,
     "root_cause": "corrupted_config_push",
     "root_cause_service": "config-server",
     "root_cause_keywords": ["config", "configuration", "push", "sidecar", "envoy", "tls", "mesh", "config-server", "rollback"],
     "fix_action": "rollback_deploy",
     "fix_target": "config-server",
     "alerts": [
-      {"service": "user-service", "alert_type": "tls_handshake_failure", "severity": "critical", "message": "TLS handshake failures to database-primary: certificate mismatch"},
-      {"service": "payment-service", "alert_type": "tls_handshake_failure", "severity": "critical", "message": "TLS handshake failures to cache-redis: certificate mismatch"},
+      {"service": "payment-service", "alert_type": "tls_cert_error", "severity": "critical", "message": "TLS certificate validation failed. All HTTPS connections rejected."},
+      {"service": "user-service", "alert_type": "connection_failure", "severity": "critical", "message": "Cannot connect to database-primary or cache-redis. All operations failing."},
       {"service": "api-gateway", "alert_type": "error_rate_high", "severity": "critical", "message": "Error rate 92% - all downstream services unreachable"},
       {"service": "frontend", "alert_type": "complete_outage", "severity": "critical", "message": "All API calls failing. Site completely down."}
+    ],
+    "noise_alerts": [
+      {"service": "payment-service", "severity": "warning", "message": "TLS certificate for payment-service.internal expires in 48 hours — renewal pending", "auto_resolve_after": 5}
     ],
     "services": {
       "config-server": {
@@ -145,9 +157,9 @@
           "[2026-03-25T14:30:00Z] INFO   Scheduled health check: all endpoints responding",
           "[2026-03-25T14:35:00Z] INFO   Certificate rotation check: next rotation in 14 days",
           "[2026-03-25T14:40:00Z] INFO   Memory usage: 250MB / 1024MB. Normal.",
-          "[2026-03-25T14:45:00Z] INFO   Processed 12 configuration sync requests",
-          "[2026-03-25T14:48:00Z] INFO   Routine config sync v4.1.0 applied",
-          "[2026-03-25T14:48:10Z] INFO   Sync completed to 6/6 services",
+          "[2026-03-25T14:45:00Z] INFO   Processed 12 service mesh sync requests",
+          "[2026-03-25T14:48:00Z] INFO   Sync v4.1.0 applied to mesh layer",
+          "[2026-03-25T14:48:10Z] INFO   Mesh sync completed: 6/6 nodes acknowledged",
           "[2026-03-25T14:50:00Z] INFO   All endpoints healthy. No errors."
         ],
         "metrics": {"cpu": 8, "memory": 25, "disk": 15, "latency_ms": 5, "connections": 12, "max_connections": 50},
@@ -163,10 +175,9 @@
         "status": "critical",
         "healthy": false,
         "logs": [
-          "[2026-03-25T14:48:20Z] ERROR  TLS handshake failed to user-service: certificate_unknown",
-          "[2026-03-25T14:48:22Z] ERROR  TLS handshake failed to payment-service: certificate_unknown",
-          "[2026-03-25T14:48:25Z] ERROR  All downstream services unreachable via mTLS",
-          "[2026-03-25T14:48:28Z] WARN   Sidecar proxy received new certificates at 14:48:10",
+          "[2026-03-25T14:48:20Z] ERROR  TLS handshake failed to user-service: ERR_CERT_AUTHORITY_INVALID",
+          "[2026-03-25T14:48:22Z] ERROR  TLS handshake failed to payment-service: ERR_CERT_AUTHORITY_INVALID",
+          "[2026-03-25T14:48:25Z] ERROR  All downstream services unreachable",
           "[2026-03-25T14:48:30Z] ERROR  Error rate: 92%. Zero successful downstream calls."
         ],
         "metrics": {"cpu": 15, "memory": 45, "disk": 28, "latency_ms": 30000, "connections": 0, "max_connections": 500},
@@ -184,10 +195,10 @@
         "status": "critical",
         "healthy": false,
         "logs": [
-          "[2026-03-25T14:48:18Z] ERROR  Sidecar certificate rotated",
           "[2026-03-25T14:48:20Z] ERROR  TLS handshake to database-primary failed: ERR_CERT_AUTHORITY_INVALID",
-          "[2026-03-25T14:48:22Z] ERROR  Cannot reach cache-redis: mTLS certificate rejected",
-          "[2026-03-25T14:48:25Z] ERROR  All dependent services unreachable"
+          "[2026-03-25T14:48:22Z] ERROR  Cannot reach cache-redis: certificate rejected",
+          "[2026-03-25T14:48:25Z] ERROR  All dependent services unreachable",
+          "[2026-03-25T14:48:28Z] WARN   Last successful connection to database: 14:48:09Z"
         ],
         "metrics": {"cpu": 10, "memory": 50, "disk": 22, "latency_ms": 30000, "connections": 0, "max_connections": 200},
         "processes": [
@@ -204,9 +215,10 @@
         "status": "critical",
         "healthy": false,
         "logs": [
-          "[2026-03-25T14:48:19Z] ERROR  Sidecar certificate rotated",
+          "[2026-03-25T14:48:19Z] ERROR  TLS certificate validation failed for outbound connections",
           "[2026-03-25T14:48:21Z] ERROR  TLS handshake to database-primary failed",
-          "[2026-03-25T14:48:24Z] ERROR  All database operations failing"
+          "[2026-03-25T14:48:24Z] ERROR  All database operations failing",
+          "[2026-03-25T14:48:26Z] WARN   Certificate CN=payment-service.internal — checking expiry..."
         ],
         "metrics": {"cpu": 8, "memory": 40, "disk": 20, "latency_ms": 30000, "connections": 0, "max_connections": 200},
         "processes": [
@@ -229,7 +241,7 @@
       "cache-redis": []
     },
     "health_on_fix": 88,
-    "notes": "The config-server itself appears healthy (status=healthy, green metrics). No rollback hint in logs. The trap is that all alerts point to downstream services. Agent must trace the common pattern (all TLS failures started at the same time) and correlate with the config-server deployment log to identify the root cause. Simply restarting individual services won't help because they'll load the same bad config."
+    "notes": "Red herring: payment-service has a cert expiry warning (noise alert) that looks like the root cause. Agent wastes steps investigating payment-service TLS. The real cause: config-server pushed bad mesh certs at 14:48. Config-server looks perfectly healthy, has no alerts, and its logs mention 'sync v4.1.0' buried among routine entries. No service log mentions config-server by name. Agent must use trace_failure or check_dependencies to discover config-server exists, then check its logs to find the timestamp correlation. Restarting individual services fails because they reload the same bad mesh config."
   },
   {
     "id": "hard_ddos_vs_traffic",
