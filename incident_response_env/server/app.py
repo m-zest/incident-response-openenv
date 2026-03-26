@@ -569,7 +569,7 @@ function updateAlerts(alerts) {
     '<div class="alert-item">' +
     '<span class="sev-pill sev-' + a.severity + '">' + a.severity + '</span>' +
     '<div><div class="alert-text">' + a.message + '</div>' +
-    '<div class="alert-svc" onclick="fillCmd(\'check_logs ' + a.service + '\')">' + a.service + '</div></div></div>'
+    '<div class="alert-svc" onclick="fillCmd(&quot;check_logs ' + a.service + '&quot;)">' + a.service + '</div></div></div>'
   ).join('');
 }
 
