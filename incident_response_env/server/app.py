@@ -67,6 +67,12 @@ async def get_baseline():
     }
 
 
+@app.get("/postmortem")
+async def get_postmortem():
+    """Return structured post-mortem incident report after episode ends."""
+    return env.get_postmortem()
+
+
 # ── Web UI API Endpoints ──────────────────────────────────────────────────
 
 
@@ -104,6 +110,7 @@ async def web_step(req: StepRequest):
     action = SREAction(command=req.command, target=req.target, parameters=req.parameters)
     obs = env.step(action)
     result = _obs_to_dict(obs)
+    result["evidence_notes"] = env.state.evidence_notes
     result["grader"] = env.get_grader_result() if obs.done else None
     return result
 
@@ -292,12 +299,18 @@ a{color:var(--accent);text-decoration:none}
         <div class="card-header">Available Commands</div>
         <div class="card-body" style="font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--text-dim)">
           check_logs {service}<br>get_metrics {service}<br>list_alerts<br>
-          check_dependencies {service}<br>restart_service {service}<br>
+          check_dependencies {service}<br>get_dependency_graph<br>
+          trace_failure {service}<br>restart_service {service}<br>
           scale_up {service}<br>rollback_deploy {service}<br>
           kill_process {service} pid={PID}<br>
           check_process_list {service}<br>check_network {service}<br>
+          add_note {observation}<br>view_notes<br>
           submit_root_cause {description}
         </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Evidence Board</div>
+        <div id="evidence-panel" class="card-body"><div class="empty">No notes yet. Use add_note to record observations.</div></div>
       </div>
       <div class="card">
         <div class="card-header">Actions Taken</div>
@@ -368,6 +381,14 @@ function updateActions() {
     '<div class="action-item"><span class="step-num">#' + (i+1) + '</span> ' + a + '</div>'
   ).join('');
   $('actions-panel').scrollTop = $('actions-panel').scrollHeight;
+}
+
+function updateEvidence(notes) {
+  if (!notes || !notes.length) { $('evidence-panel').innerHTML = '<div class="empty">No notes yet. Use add_note to record observations.</div>'; return; }
+  $('evidence-panel').innerHTML = notes.map(n =>
+    '<div class="action-item"><span class="step-num">[Step ' + n.step + ']</span> ' + n.text + '</div>'
+  ).join('');
+  $('evidence-panel').scrollTop = $('evidence-panel').scrollHeight;
 }
 
 function appendTerminal(cmd, output) {
@@ -459,6 +480,7 @@ async function executeCmd() {
     $('score-display').textContent = data.score.toFixed(2);
     updateAlerts(data.alerts);
     updateActions();
+    updateEvidence(data.evidence_notes);
     if (data.done) {
       episodeActive = false;
       showSummary(data);
@@ -485,7 +507,8 @@ function showSummary(data) {
     'Root cause found: <span>' + (g.root_cause_found ? 'Yes' : 'No') + '</span><br>' +
     'Steps taken: <span>' + (g.steps_taken || data.step_count) + ' / ' + (g.optimal_steps || '?') + ' optimal</span><br>' +
     'Health: <span>' + (g.health_initial || 0).toFixed(0) + '% &rarr; ' + (g.health_final || data.system_health).toFixed(0) + '%</span><br>' +
-    'Destructive actions: <span>' + (g.destructive_actions || 0) + '</span>';
+    'Destructive actions: <span>' + (g.destructive_actions || 0) + '</span><br>' +
+    '<a href="/postmortem" target="_blank" style="color:var(--accent)">View full post-mortem report</a>';
   $('overlay').classList.add('visible');
 }
 

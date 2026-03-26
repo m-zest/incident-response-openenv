@@ -56,12 +56,16 @@ Available commands:
 - get_metrics {service}
 - list_alerts
 - check_dependencies {service}
+- get_dependency_graph — View full dependency tree with health status
+- trace_failure {service} — Trace upstream/downstream blast radius
 - restart_service {service}
 - scale_up {service}
 - rollback_deploy {service}
 - kill_process {service} — Kill a specific process by PID. Pass PID in parameters: {"pid": "1234"}
 - check_process_list {service}
 - check_network {service}
+- add_note {text} — Save an observation to your evidence board
+- view_notes — Review your saved observations
 - submit_root_cause {description} — Put your diagnosis in the "target" field. This ENDS the episode.
 
 RESPONSE FORMAT — respond with ONLY a JSON object, no other text:

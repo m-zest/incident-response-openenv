@@ -197,6 +197,7 @@ class SREEnvironment(Environment):
         self._state.services_restarted = list(self._cluster.restarted_services)
         self._state.services_investigated = list(self._cluster.investigated_services)
         self._state.correct_services_investigated = list(self._cluster.correct_investigations)
+        self._state.evidence_notes = list(self._cluster.evidence_board)
 
         # Compute step reward
         is_correct_fix = (
@@ -290,4 +291,84 @@ class SREEnvironment(Environment):
             "health_initial": self._state.initial_health,
             "health_final": self._state.current_health,
             "destructive_actions": self._state.destructive_actions,
+        }
+
+    def get_postmortem(self) -> dict:
+        """Generate a structured post-mortem incident report."""
+        if not self._state.done:
+            return {"error": "Episode not finished. Complete the episode first."}
+
+        # Build timeline from actions
+        investigation_cmds = {"check_logs", "get_metrics", "check_process_list",
+                              "check_network", "check_dependencies", "trace_failure",
+                              "get_dependency_graph", "list_alerts"}
+        fix_cmds = {"restart_service", "scale_up", "rollback_deploy", "kill_process"}
+
+        timeline = []
+        for i, action_str in enumerate(self._state.actions_taken):
+            parts = action_str.strip().split(" ", 1)
+            cmd = parts[0]
+            target = parts[1] if len(parts) > 1 else ""
+
+            if cmd in investigation_cmds:
+                if target == self._cluster.root_cause_service:
+                    finding = "Root cause service investigated"
+                else:
+                    finding = "Service investigated"
+            elif cmd in fix_cmds:
+                if (target == self._cluster.fix_target
+                        and cmd == self._cluster.fix_action):
+                    finding = "Correct fix applied"
+                elif target in self._state.services_restarted:
+                    finding = "Service restarted (not root cause)"
+                else:
+                    finding = "Remediation attempted"
+            elif cmd == "submit_root_cause":
+                finding = ("Correct root cause submitted"
+                           if self._state.root_cause_found
+                           else "Incorrect root cause submitted")
+            elif cmd == "add_note":
+                finding = f"Note recorded: {target[:60]}"
+            else:
+                finding = "Action taken"
+
+            timeline.append({
+                "step": i + 1,
+                "action": action_str.strip(),
+                "finding": finding,
+            })
+
+        # Efficiency rating
+        excess = max(0, self._state.step_count - self._state.optimal_steps)
+        unnecessary = len([a for a in self._state.actions_taken
+                          if a.split()[0] in fix_cmds
+                          and a.split()[-1] != self._cluster.fix_target])
+        if excess == 0:
+            efficiency = "optimal"
+        elif excess <= 2:
+            efficiency = "good"
+        elif excess <= 5:
+            efficiency = "fair"
+        else:
+            efficiency = "poor"
+
+        return {
+            "incident_title": self._cluster.scenario.get("name", "Unknown Incident"),
+            "scenario_id": self._state.scenario_id,
+            "difficulty": self._state.task_id,
+            "timeline": timeline,
+            "root_cause_identified": self._state.root_cause_found,
+            "root_cause_actual": self._cluster.root_cause,
+            "root_cause_submitted": self._state.root_cause_submitted or "(not submitted)",
+            "total_steps": self._state.step_count,
+            "optimal_steps": self._state.optimal_steps,
+            "unnecessary_actions": unnecessary,
+            "destructive_actions": self._state.destructive_actions,
+            "health_initial": self._state.initial_health,
+            "health_final": self._state.current_health,
+            "final_score": round(self._state.cumulative_reward, 3),
+            "efficiency_rating": efficiency,
+            "evidence_notes": self._state.evidence_notes,
+            "services_investigated": list(set(self._state.services_investigated)),
+            "services_restarted": list(set(self._state.services_restarted)),
         }

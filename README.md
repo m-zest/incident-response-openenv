@@ -58,12 +58,16 @@ The agent interacts via CLI-style commands:
 | `get_metrics {service}` | View CPU, memory, disk, latency, connections |
 | `list_alerts` | View all firing alerts |
 | `check_dependencies {service}` | See upstream/downstream dependencies |
+| `get_dependency_graph` | View full dependency tree with health status and impact analysis |
+| `trace_failure {service}` | Trace upstream dependencies, downstream blast radius, unhealthy paths |
 | `restart_service {service}` | Restart a service process |
 | `scale_up {service}` | Add service replicas |
 | `rollback_deploy {service}` | Roll back to previous version |
 | `kill_process {service}` | Kill a process by PID (use parameters: {"pid": "1234"}) |
 | `check_process_list {service}` | View running processes (detects malware) |
 | `check_network {service}` | View network connections (detects exfiltration) |
+| `add_note {text}` | Save an observation to the evidence board |
+| `view_notes` | Review all saved observations with step numbers |
 | `submit_root_cause {description}` | Declare diagnosis (ends episode) |
 
 ### Observation Space
@@ -237,6 +241,8 @@ python baseline.py
 | `/tasks` | GET | List available tasks with action schema |
 | `/grader` | GET | Get grading result after episode completion |
 | `/baseline` | GET | Get baseline scores for all tasks |
+| `/postmortem` | GET | Structured post-mortem incident report (after episode ends) |
+| `/web` | GET | Interactive SRE dashboard |
 
 ---
 

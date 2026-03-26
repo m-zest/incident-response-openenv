@@ -20,7 +20,9 @@ class SREAction(BaseModel):
             "The CLI command to execute. One of: "
             "check_logs, get_metrics, list_alerts, check_dependencies, "
             "restart_service, scale_up, rollback_deploy, kill_process, "
-            "check_process_list, check_network, submit_root_cause"
+            "check_process_list, check_network, "
+            "add_note, view_notes, get_dependency_graph, trace_failure, "
+            "submit_root_cause"
         ),
     )
     target: str = Field(
@@ -72,6 +74,10 @@ class SREObservation(BaseModel):
             "kill_process {service} (parameters: {pid})",
             "check_process_list {service}",
             "check_network {service}",
+            "add_note {text}",
+            "view_notes",
+            "get_dependency_graph",
+            "trace_failure {service}",
             "submit_root_cause {description}",
         ],
         description="Available commands the agent can use.",
@@ -82,7 +88,7 @@ class SREState(BaseModel):
     """Internal state tracking for the episode (hidden from agent, used by grader)."""
 
     episode_id: str = ""
-    task_id: str = Field(default="easy", description="Difficulty tier: easy, medium, hard")
+    task_id: str = Field(default="easy", description="Difficulty tier: easy, medium, hard, expert")
     scenario_id: str = ""
     step_count: int = 0
     max_steps: int = 20
@@ -97,5 +103,6 @@ class SREState(BaseModel):
     destructive_actions: int = 0
     optimal_steps: int = 3
     actions_taken: list[str] = Field(default_factory=list)
+    evidence_notes: list[dict] = Field(default_factory=list)
     cumulative_reward: float = 0.0
     done: bool = False

@@ -8,8 +8,12 @@ agent commands against the simulated cluster.
 import json
 import os
 import random
+import hashlib
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
+
+import networkx as nx
 
 SCENARIOS_DIR = Path(__file__).parent.parent / "scenarios"
 
@@ -21,6 +25,47 @@ def load_scenarios(difficulty: str) -> list[dict]:
         raise FileNotFoundError(f"Scenario file not found: {path}")
     with open(path) as f:
         return json.load(f)
+
+
+# ── Dynamic Log Generator ─────────────────────────────────────────────────
+
+
+class LogGenerator:
+    """Template-based log generator. Seeded RNG for determinism within an episode."""
+
+    def __init__(self, seed: str):
+        self._rng = random.Random(seed)
+        self._base_time = datetime(2026, 3, 25, 8, 0, 0)
+        self._step = 0
+
+    def _ts(self, offset_s: int = 0) -> str:
+        t = self._base_time + timedelta(seconds=self._step * 30 + offset_s)
+        return t.strftime("[%Y-%m-%dT%H:%M:%SZ]")
+
+    def advance(self):
+        self._step += 1
+
+    def generate_degradation_log(self, service: str, metric: str, value: float) -> str:
+        templates = [
+            f"{self._ts()} WARN   {service}: {metric} degraded to {value:.0f}%",
+            f"{self._ts(1)} WARN   Threshold breach on {service}: {metric}={value:.0f}%",
+            f"{self._ts(2)} ERROR  {service} {metric} critical: {value:.0f}% (limit approaching)",
+        ]
+        return self._rng.choice(templates)
+
+    def generate_cascade_log(self, source: str, target: str) -> str:
+        templates = [
+            f"{self._ts()} ERROR  {target}: upstream dependency {source} unhealthy, requests failing",
+            f"{self._ts(1)} WARN   {target}: connection errors to {source}, circuit breaker triggered",
+            f"{self._ts(2)} ERROR  {target}: timeout waiting for {source} response",
+        ]
+        return self._rng.choice(templates)
+
+    def generate_alert_escalation(self, service: str, metric: str) -> str:
+        return f"{self._ts()} CRITICAL  {service}: {metric} has crossed critical threshold"
+
+
+# ── Simulated Cluster ──────────────────────────────────────────────────────
 
 
 class SimulatedCluster:
@@ -49,6 +94,10 @@ class SimulatedCluster:
         self.optimal_steps = scenario["optimal_steps"]
         self.max_steps = scenario["max_steps"]
 
+        # Seeded log generator for dynamic logs
+        seed = f"{scenario['id']}_{random.randint(0, 999999)}"
+        self._log_gen = LogGenerator(seed)
+
         # Deep copy services so we can mutate
         self.services = {}
         for name, svc in scenario["services"].items():
@@ -71,6 +120,18 @@ class SimulatedCluster:
         self.correct_investigations: list[str] = []
         self.destructive_actions = 0
         self.steps_since_restart = 0
+
+        # Evidence board for agent notes
+        self.evidence_board: list[dict] = []
+        self._current_step = 0
+
+        # Build dependency graph with NetworkX
+        self._dep_graph = nx.DiGraph()
+        for svc in self.services:
+            self._dep_graph.add_node(svc)
+        for svc, deps in self.dependencies.items():
+            for dep in deps:
+                self._dep_graph.add_edge(svc, dep)  # svc depends on dep
 
     def get_active_alerts(self) -> list[dict]:
         """Return currently firing alerts."""
@@ -99,10 +160,26 @@ class SimulatedCluster:
             return self._check_process_list(target)
         elif command == "check_network":
             return self._check_network(target)
+        elif command == "add_note":
+            return self._add_note(target)
+        elif command == "view_notes":
+            return self._view_notes()
+        elif command == "get_dependency_graph":
+            return self._get_dependency_graph()
+        elif command == "trace_failure":
+            return self._trace_failure(target)
         elif command == "submit_root_cause":
             return self._submit_root_cause(target, parameters)
         else:
-            return f"ERROR: Unknown command '{command}'. Use list_alerts, check_logs, get_metrics, check_dependencies, restart_service, scale_up, rollback_deploy, kill_process, check_process_list, check_network, or submit_root_cause."
+            return (
+                f"ERROR: Unknown command '{command}'. Available: "
+                "check_logs, get_metrics, list_alerts, check_dependencies, "
+                "restart_service, scale_up, rollback_deploy, kill_process, "
+                "check_process_list, check_network, add_note, view_notes, "
+                "get_dependency_graph, trace_failure, submit_root_cause."
+            )
+
+    # ── Investigation commands ─────────────────────────────────────────────
 
     def _check_logs(self, service: str, parameters: dict) -> str:
         if service not in self.services:
@@ -149,19 +226,41 @@ class SimulatedCluster:
             f"  Depended on by: {dependents if dependents else ['(none)']}"
         )
 
+    def _check_process_list(self, service: str) -> str:
+        if service not in self.services:
+            return f"ERROR: Service '{service}' not found."
+        self.investigated_services.append(service)
+        if service == self.root_cause_service:
+            self.correct_investigations.append(service)
+        procs = self.services[service].get("processes", [])
+        if not procs:
+            return f"=== Process List for {service} ===\n  No processes running (service may be down)."
+        return f"=== Process List for {service} ===\n" + "\n".join(f"  {p}" for p in procs)
+
+    def _check_network(self, service: str) -> str:
+        if service not in self.services:
+            return f"ERROR: Service '{service}' not found."
+        self.investigated_services.append(service)
+        if service == self.root_cause_service:
+            self.correct_investigations.append(service)
+        net = self.services[service].get("network", [])
+        if not net:
+            return f"=== Network Connections for {service} ===\n  No active connections."
+        return f"=== Network Connections for {service} ===\n" + "\n".join(f"  {n}" for n in net)
+
+    # ── Remediation commands ───────────────────────────────────────────────
+
     def _restart_service(self, service: str) -> str:
         if service not in self.services:
             return f"ERROR: Service '{service}' not found."
 
         self.restarted_services.append(service)
 
-        # If this is the correct fix target
         if service == self.fix_target and self.fix_action == "restart_service":
             self.services[service]["healthy"] = True
             self.services[service]["status"] = "healthy"
             old_health = self.health
             self.health = self.health_on_fix
-            # Clear related alerts
             self.alerts = [a for a in self.alerts if a["service"] != service]
             self.resolved = True
             return (
@@ -169,7 +268,6 @@ class SimulatedCluster:
                 f"System health: {old_health:.0f}% -> {self.health:.0f}%\n"
                 f"Alerts cleared for {service}."
             )
-        # If restart is a temporary fix (e.g., crypto-miner scenario)
         elif service == self.fix_target and self.restart_temporary:
             old_health = self.health
             temp_health = self.scenario.get("health_on_restart", self.health + 20)
@@ -180,7 +278,6 @@ class SimulatedCluster:
                 f"System health: {old_health:.0f}% -> {self.health:.0f}%\n"
                 f"WARNING: Alerts temporarily cleared but may recur."
             )
-        # Restarting a healthy service (penalty-worthy)
         elif self.services[service]["healthy"]:
             return (
                 f"Service '{service}' restarted (was already healthy).\n"
@@ -188,7 +285,6 @@ class SimulatedCluster:
                 f"WARNING: Unnecessary restart of a healthy service."
             )
         else:
-            # Restarting a non-root-cause unhealthy service
             self.services[service]["healthy"] = True
             old_health = self.health
             self.health = min(100, self.health + 5)
@@ -244,19 +340,15 @@ class SimulatedCluster:
     def _kill_process(self, service: str, parameters: dict) -> str:
         if service not in self.services:
             return f"ERROR: Service '{service}' not found."
-        # Extract PID from parameters or target
         pid = str(parameters.get("pid", ""))
         if not pid:
             return "ERROR: No PID specified. Usage: kill_process {service} with parameters: {\"pid\": \"1234\"}"
 
-        # Check if this is the malicious process
         if self.malicious_pid and pid == str(self.malicious_pid) and service == self.fix_target:
-            # Remove the malicious process from the process list
             procs = self.services[service].get("processes", [])
             self.services[service]["processes"] = [
                 p for p in procs if f"PID {pid}" not in p
             ]
-            # Remove suspicious network connections (external IPs)
             net = self.services[service].get("network", [])
             self.services[service]["network"] = [
                 n for n in net if "10.0.1." in n.split("->")[-1] or "LISTEN" in n
@@ -266,7 +358,7 @@ class SimulatedCluster:
             old_health = self.health
             self.health = self.health_on_fix
             self.resolved = True
-            self.restart_temporary = False  # Malware killed, no respawn
+            self.restart_temporary = False
             self.alerts = [a for a in self.alerts if a["service"] != service]
             return (
                 f"Killed process PID {pid} on {service}.\n"
@@ -274,7 +366,6 @@ class SimulatedCluster:
                 f"Malicious process terminated. Service restored."
             )
         else:
-            # Killing a legitimate process is destructive
             found = any(f"PID {pid}" in p for p in self.services[service].get("processes", []))
             if found:
                 self.destructive_actions += 1
@@ -286,31 +377,95 @@ class SimulatedCluster:
             else:
                 return f"ERROR: Process PID {pid} not found on {service}."
 
-    def _check_process_list(self, service: str) -> str:
-        if service not in self.services:
-            return f"ERROR: Service '{service}' not found."
-        self.investigated_services.append(service)
-        if service == self.root_cause_service:
-            self.correct_investigations.append(service)
-        procs = self.services[service].get("processes", [])
-        if not procs:
-            return f"=== Process List for {service} ===\n  No processes running (service may be down)."
-        return f"=== Process List for {service} ===\n" + "\n".join(f"  {p}" for p in procs)
+    # ── Evidence board ─────────────────────────────────────────────────────
 
-    def _check_network(self, service: str) -> str:
-        if service not in self.services:
-            return f"ERROR: Service '{service}' not found."
-        self.investigated_services.append(service)
-        if service == self.root_cause_service:
-            self.correct_investigations.append(service)
-        net = self.services[service].get("network", [])
-        if not net:
-            return f"=== Network Connections for {service} ===\n  No active connections."
-        return f"=== Network Connections for {service} ===\n" + "\n".join(f"  {n}" for n in net)
+    def _add_note(self, text: str) -> str:
+        if not text.strip():
+            return "ERROR: Empty note. Usage: add_note {your observation or hypothesis}"
+        note = {"step": self._current_step, "text": text.strip()}
+        self.evidence_board.append(note)
+        return f"Note saved at step {self._current_step}: \"{text.strip()}\""
+
+    def _view_notes(self) -> str:
+        if not self.evidence_board:
+            return "=== Evidence Board ===\n  No notes recorded yet. Use add_note to save observations."
+        lines = ["=== Evidence Board ==="]
+        for n in self.evidence_board:
+            lines.append(f"  [Step {n['step']}] {n['text']}")
+        return "\n".join(lines)
+
+    # ── Dependency graph (NetworkX) ────────────────────────────────────────
+
+    def _get_dependency_graph(self) -> str:
+        lines = ["=== Dependency Graph ==="]
+        lines.append(f"  Services: {len(self._dep_graph.nodes)}")
+        lines.append(f"  Dependencies: {len(self._dep_graph.edges)}")
+        lines.append("")
+
+        # Full tree
+        lines.append("  Dependency tree:")
+        for svc in sorted(self._dep_graph.nodes):
+            deps = list(self._dep_graph.successors(svc))
+            dependents = list(self._dep_graph.predecessors(svc))
+            status = self.services.get(svc, {}).get("status", "unknown")
+            marker = "x" if status in ("critical", "degraded", "down") else "o"
+            lines.append(f"    [{marker}] {svc} ({status})")
+            if deps:
+                lines.append(f"        depends on: {', '.join(deps)}")
+            if dependents:
+                lines.append(f"        depended on by: {', '.join(dependents)}")
+
+        # Most critical service by in-degree (most things depend on it)
+        lines.append("")
+        in_degrees = sorted(
+            self._dep_graph.in_degree(), key=lambda x: x[1], reverse=True
+        )
+        if in_degrees and in_degrees[0][1] > 0:
+            top = in_degrees[0]
+            lines.append(f"  Highest impact service: {top[0]} ({top[1]} dependents)")
+
+        return "\n".join(lines)
+
+    def _trace_failure(self, service: str) -> str:
+        if service not in self._dep_graph:
+            return f"ERROR: Service '{service}' not found in dependency graph."
+
+        # Upstream: what this service needs (follow outgoing edges)
+        upstream = set()
+        for node in nx.descendants(self._dep_graph, service):
+            upstream.add(node)
+
+        # Downstream: what breaks if this service fails (follow incoming edges)
+        reverse = self._dep_graph.reverse()
+        downstream = set()
+        for node in nx.descendants(reverse, service):
+            downstream.add(node)
+
+        # Blast radius
+        blast = downstream | {service}
+
+        # Check health of upstream deps
+        unhealthy_upstream = []
+        for u in upstream:
+            svc = self.services.get(u, {})
+            if not svc.get("healthy", True):
+                unhealthy_upstream.append(u)
+
+        lines = [f"=== Failure Trace for {service} ==="]
+        lines.append(f"  Upstream dependencies: {sorted(upstream) if upstream else ['(none)']}")
+        lines.append(f"  Downstream dependents: {sorted(downstream) if downstream else ['(none)']}")
+        lines.append(f"  Blast radius: {len(blast)} service(s)")
+        if unhealthy_upstream:
+            lines.append(f"  UNHEALTHY upstream: {sorted(unhealthy_upstream)}")
+            lines.append(f"  -> Root cause may be in: {', '.join(sorted(unhealthy_upstream))}")
+        else:
+            lines.append(f"  All upstream dependencies healthy.")
+
+        return "\n".join(lines)
+
+    # ── Root cause submission ──────────────────────────────────────────────
 
     def _submit_root_cause(self, description: str, parameters: dict = None) -> str:
-        # Merge target string with any description/reason in parameters
-        # LLMs sometimes send: {"command": "submit_root_cause", "target": "", "parameters": {"description": "..."}}
         parts = [description]
         if parameters:
             for key in ("description", "reason", "root_cause", "diagnosis", "text"):
@@ -319,11 +474,9 @@ class SimulatedCluster:
         merged = " ".join(p for p in parts if p)
 
         self.submitted_root_cause = merged
-        # Check if the description contains root cause keywords
         desc_lower = merged.lower()
         matches = sum(1 for kw in self.root_cause_keywords if kw.lower() in desc_lower)
         if matches >= 2 or self.root_cause.lower() in desc_lower:
-            # Fully correct: 2+ keywords or exact root cause string
             self.root_cause_found = True
             if not self.resolved:
                 self.health = self.health_on_fix
@@ -333,7 +486,6 @@ class SimulatedCluster:
                 f"Correct diagnosis. System health restored to {self.health:.0f}%."
             )
         elif matches >= 1:
-            # Partially correct but lenient: 1 keyword is enough to accept
             self.root_cause_found = True
             if not self.resolved:
                 self.health = self.health_on_fix
@@ -349,15 +501,63 @@ class SimulatedCluster:
                 f"Incorrect diagnosis. The actual issue was not identified."
             )
 
+    # ── Time-evolving state ────────────────────────────────────────────────
+
     def tick(self):
-        """Called each step to handle time-based effects (e.g., malware respawning)."""
+        """Called each step. Handles malware respawn AND progressive degradation."""
+        self._current_step += 1
+        self._log_gen.advance()
+
+        # Malware respawn logic
         if self.restart_temporary and self.steps_since_restart >= 0:
             self.steps_since_restart += 1
             if self.steps_since_restart >= self.restart_revert_steps and not self.root_cause_found:
-                # Malware respawns, health degrades again
                 if self.health > self.initial_health + 10:
                     self.health = max(self.initial_health, self.health - 15)
-                    # Re-add alerts
                     if not self.alerts:
                         for a in self.scenario["alerts"]:
                             self.alerts.append(dict(a))
+
+        # Progressive degradation: if root cause not fixed, things get worse
+        if not self.resolved and self._current_step > 2:
+            rc_svc = self.services.get(self.root_cause_service)
+            if rc_svc and not rc_svc["healthy"]:
+                # Degrade root cause service metrics
+                m = rc_svc["metrics"]
+                degrade = min(3, self._current_step * 0.5)
+                if m["cpu"] < 100:
+                    m["cpu"] = min(100, m["cpu"] + degrade)
+                if m["latency_ms"] < 60000:
+                    m["latency_ms"] = int(m["latency_ms"] * 1.08)
+
+                # Overall health degrades
+                self.health = max(5, self.health - 1.5)
+
+                # Append dynamic degradation log
+                rc_svc["logs"].append(
+                    self._log_gen.generate_degradation_log(
+                        self.root_cause_service, "CPU", m["cpu"]
+                    )
+                )
+
+                # Cascade to dependents after step 4
+                if self._current_step > 4:
+                    reverse = self._dep_graph.reverse()
+                    for dep in nx.descendants(reverse, self.root_cause_service):
+                        dep_svc = self.services.get(dep)
+                        if dep_svc:
+                            dep_m = dep_svc["metrics"]
+                            dep_m["latency_ms"] = int(dep_m["latency_ms"] * 1.05)
+                            self.health = max(5, self.health - 0.5)
+                            dep_svc["logs"].append(
+                                self._log_gen.generate_cascade_log(
+                                    self.root_cause_service, dep
+                                )
+                            )
+
+                # Escalate alerts after step 5
+                if self._current_step == 5:
+                    for a in self.alerts:
+                        if a["severity"] == "warning":
+                            a["severity"] = "critical"
+                            a["message"] += " [ESCALATED]"
