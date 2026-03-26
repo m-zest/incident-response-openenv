@@ -75,7 +75,7 @@ class SimulatedCluster:
     No real servers, no real infrastructure.
     """
 
-    def __init__(self, scenario: dict):
+    def __init__(self, scenario: dict, seed: int = None):
         self.scenario = scenario
         self.scenario_id = scenario["id"]
         self.root_cause = scenario["root_cause"]
@@ -94,9 +94,14 @@ class SimulatedCluster:
         self.optimal_steps = scenario["optimal_steps"]
         self.max_steps = scenario["max_steps"]
 
+        # Seeded RNG for reproducibility
+        if seed is None:
+            seed = random.randint(0, 999999)
+        self._seed = seed
+        self._rng = random.Random(seed)
+
         # Seeded log generator for dynamic logs
-        seed = f"{scenario['id']}_{random.randint(0, 999999)}"
-        self._log_gen = LogGenerator(seed)
+        self._log_gen = LogGenerator(str(seed))
 
         # Deep copy services so we can mutate
         self.services = {}

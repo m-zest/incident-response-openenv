@@ -92,6 +92,7 @@ class SREState(BaseModel):
     scenario_id: str = ""
     step_count: int = 0
     max_steps: int = 20
+    seed: int = 0
     root_cause: str = Field(default="", description="The hidden actual root cause.")
     root_cause_found: bool = False
     root_cause_submitted: str = ""

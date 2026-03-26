@@ -67,30 +67,37 @@ class SREEnvironment(Environment):
             "expert": load_scenarios("expert"),
         }
 
-    def reset(self, task_id: str = "easy", scenario_index: int = -1) -> SREObservation:
+    def reset(self, task_id: str = "easy", scenario_index: int = -1, seed: int = None) -> SREObservation:
         """
         Initialize a new incident episode.
 
         Args:
-            task_id: Difficulty tier - "easy", "medium", or "hard"
+            task_id: Difficulty tier - "easy", "medium", "hard", or "expert"
             scenario_index: Specific scenario index, or -1 for random
+            seed: Optional seed for reproducibility. None = random seed.
         """
         if task_id not in self._scenarios:
             task_id = "easy"
 
+        # Determine seed
+        if seed is None:
+            seed = random.randint(0, 999999)
+
         scenarios = self._scenarios[task_id]
         if scenario_index < 0 or scenario_index >= len(scenarios):
-            scenario = random.choice(scenarios)
+            rng = random.Random(seed)
+            scenario = rng.choice(scenarios)
         else:
             scenario = scenarios[scenario_index]
 
-        # Initialize the simulated cluster
-        self._cluster = SimulatedCluster(scenario)
+        # Initialize the simulated cluster with seed
+        self._cluster = SimulatedCluster(scenario, seed=seed)
 
         # Initialize episode state
         self._state = SREState(
             episode_id=str(uuid.uuid4()),
             task_id=task_id,
+            seed=seed,
             scenario_id=scenario["id"],
             step_count=0,
             max_steps=scenario["max_steps"],

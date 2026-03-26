@@ -20,7 +20,8 @@ import os
 import json
 import sys
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError, APITimeoutError, APIConnectionError
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # Add parent to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -93,6 +94,23 @@ Example 7 — submit security root cause:
 """
 
 
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=2, min=5, max=60),
+    retry=retry_if_exception_type((RateLimitError, APITimeoutError, APIConnectionError)),
+    before_sleep=lambda rs: print(f"  Rate limited. Retrying in {rs.next_action.sleep:.0f}s..."),
+)
+def call_llm(client: OpenAI, messages: list, model: str):
+    """Call the LLM with automatic retry on rate limits and transient errors."""
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        max_tokens=1024,
+        temperature=0.2,
+    )
+    return response
+
+
 def parse_action(response_text: str) -> SREAction:
     """Parse LLM response into an SREAction."""
     text = (response_text or "").strip()
@@ -136,15 +154,10 @@ def run_episode(env: SREEnvironment, client: OpenAI, task_id: str, scenario_idx:
     steps = 0
     while not obs.done and steps < obs.max_steps:
         try:
-            response = client.chat.completions.create(
-                model=MODEL,
-                messages=messages,
-                max_tokens=1000,
-                temperature=0.1,
-            )
+            response = call_llm(client, messages, MODEL)
             assistant_msg = response.choices[0].message.content
         except Exception as e:
-            print(f"  API error: {e}")
+            print(f"  API error (after retries): {e}")
             break
 
         # Parse action from LLM response
