@@ -61,15 +61,15 @@ async def get_baseline():
     pre-computed scores from our baseline runs.
     """
     return {
-        "model": "llama-3.3-70b-versatile",
-        "provider": "groq",
+        "model": "nvidia/nemotron-3-super-120b-a12b",
         "scores": {
-            "easy": {"mean": 0.91, "scenarios_tested": 5},
-            "medium": {"mean": 0.52, "scenarios_tested": 4},
-            "hard": {"mean": 0.18, "scenarios_tested": 3},
-            "expert": {"mean": 0.08, "scenarios_tested": 2},
+            "easy": {"ai": 0.77, "human": 0.90, "scenarios": 5},
+            "medium": {"ai": 0.46, "human": 0.80, "scenarios": 4},
+            "hard": {"ai": 0.26, "human": 0.70, "scenarios": 3},
+            "expert": {"ai": 0.00, "human": 0.74, "scenarios": 2},
         },
-        "notes": "Scores computed using Groq API with Llama 3.3 70B. Chain-of-Thought prompting enabled.",
+        "total_scenarios": 14,
+        "note": "Expert tier is fully solvable by humans (0.74 in 9 steps) but defeats the 120B parameter model, demonstrating significant RL training potential.",
     }
 
 
@@ -310,6 +310,8 @@ a{color:var(--accent);text-decoration:none}
 .action-item:last-child{border-bottom:none}
 .action-item .step-num{color:var(--accent);font-weight:600}
 .empty{color:var(--text-muted);padding:18px 0;text-align:center;font-size:11px}
+.term-hint{color:var(--text-muted);font-size:11px;font-family:var(--sans);margin-top:6px;
+  font-style:italic;opacity:.7}
 .bottombar{display:flex;align-items:center;gap:10px;padding:14px 28px;
   background:var(--bg-elevated);border-top:1px solid var(--border);flex-shrink:0}
 .bottombar select,.bottombar input,.bottombar button{font-family:var(--sans);font-size:13px;outline:none}
@@ -420,13 +422,21 @@ a{color:var(--accent);text-decoration:none}
           <div id="terminal" class="terminal">
             <div class="term-welcome">
               <h2>Welcome, On-Call Engineer</h2>
-              <p>Select a difficulty tier and start a new episode. Investigate alerts, trace dependencies, fix the root cause, then submit your diagnosis.</p>
+              <p>Select a difficulty tier and click <b>New Episode</b>.</p>
               <div class="tiers">
-                <span class="tier-tag tier-easy">Easy</span>
-                <span class="tier-tag tier-medium">Medium</span>
-                <span class="tier-tag tier-hard">Hard</span>
-                <span class="tier-tag tier-expert">Expert</span>
+                <span class="tier-tag tier-easy">Easy -- single alert, 10 steps</span>
+                <span class="tier-tag tier-medium">Medium -- correlated failures, 15 steps</span>
+                <span class="tier-tag tier-hard">Hard -- security ambiguity, 20 steps</span>
+                <span class="tier-tag tier-expert">Expert -- forensic investigation, 25 steps</span>
               </div>
+              <p style="margin-top:20px;font-size:12px;color:var(--text-muted);line-height:1.8;max-width:420px">
+                1. Click alert service names to investigate<br>
+                2. Use the commands panel on the right<br>
+                3. Fix the issue, then submit your diagnosis<br>
+                4. Check <b>Service Map</b> tab for live dependency graph<br>
+                5. Check <b>Post-Mortem</b> tab for detailed scoring<br>
+                <span style="color:var(--accent)">Tip:</span> Click any command to auto-fill. Click a service pill to complete it.
+              </p>
             </div>
           </div>
         </div>
@@ -626,12 +636,32 @@ function updateEvidence(notes) {
   $('evidence-panel').scrollTop = $('evidence-panel').scrollHeight;
 }
 
-function appendTerminal(cmd, output) {
+var _hintHistory = [];
+function getHint(cmd) {
+  _hintHistory.push(cmd || '');
+  var cmds = _hintHistory;
+  var hasFix = cmds.some(function(c) { return /^(restart_service|rollback_deploy|scale_up|kill_process)/.test(c); });
+  var hasSubmit = cmds.some(function(c) { return /^submit_root_cause/.test(c); });
+  var logCount = cmds.filter(function(c) { return /^check_logs/.test(c); }).length;
+  var investCount = cmds.filter(function(c) { return /^(check_logs|get_metrics|check_process_list|check_network)/.test(c); }).length;
+  if (!cmd) return 'Start by clicking list_alerts or clicking a service name in the alerts panel';
+  if (/^list_alerts/.test(cmd)) return 'Click a service name above to check its logs';
+  if (hasFix && !hasSubmit && cmds.length - cmds.indexOf(cmds.filter(function(c) { return /^(restart|rollback|scale|kill)/.test(c); }).pop()) > 2)
+    return 'Submit your root cause diagnosis with submit_root_cause';
+  if (hasFix && !hasSubmit) return 'System health changed. Submit your root cause diagnosis with submit_root_cause';
+  if (/^(check_logs|get_metrics)/.test(cmd) && investCount < 3) return 'Try get_metrics or check_dependencies on this service, or check_logs on another alerted service';
+  if (investCount >= 3) return 'Try get_dependency_graph to see the full service map, or trace_failure on the most suspicious service';
+  return '';
+}
+
+function appendTerminal(cmd, output, showHint) {
   const el = document.createElement('div');
   el.className = 'term-step';
   const time = new Date().toLocaleTimeString();
+  var hint = showHint ? getHint(cmd) : '';
   el.innerHTML = (cmd ? '<div class="term-cmd">' + cmd + ' <span class="term-time">' + time + '</span></div>' : '') +
-    '<div class="term-output">' + colorize(output.replace(/</g,'&lt;').replace(/>/g,'&gt;')) + '</div>';
+    '<div class="term-output">' + colorize(output.replace(/</g,'&lt;').replace(/>/g,'&gt;')) + '</div>' +
+    (hint ? '<div class="term-hint">' + hint + '</div>' : '');
   $('terminal').appendChild(el);
   $('terminal').scrollTop = $('terminal').scrollHeight;
 }
@@ -691,9 +721,10 @@ async function startEpisode() {
     updateAlerts(data.alerts);
     updateServiceMap(data.alerts);
     updateActions();
-    appendTerminal('', data.output);
+    _hintHistory = [];
+    appendTerminal('', data.output, true);
   } catch (e) {
-    appendTerminal('', 'ERROR: Failed to start episode: ' + e.message);
+    appendTerminal('', 'ERROR: Failed to start episode: ' + e.message, false);
   }
 }
 
@@ -713,7 +744,7 @@ async function executeCmd() {
       body: JSON.stringify(parsed)
     });
     const data = await res.json();
-    appendTerminal(parsed.command + (parsed.target ? ' ' + parsed.target : ''), data.output);
+    appendTerminal(parsed.command + (parsed.target ? ' ' + parsed.target : ''), data.output, true);
     updateHealth(data.system_health);
     $('step-display').textContent = data.step_count + '/' + data.max_steps;
     $('score-display').textContent = data.score.toFixed(2);
