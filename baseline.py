@@ -50,6 +50,7 @@ CRITICAL WORKFLOW:
 - Step 4: AFTER fixing, submit your root cause diagnosis
 - If you suspect a security issue (unusual CPU, unknown processes), use check_process_list and check_network
 - Do NOT restart healthy services — only restart the broken one
+- Heavy services (database, redis) take 2 steps to restart — investigate other services while waiting
 - Do NOT submit root cause without fixing first
 
 Available commands:
