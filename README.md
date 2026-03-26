@@ -61,6 +61,7 @@ The agent interacts via CLI-style commands:
 | `restart_service {service}` | Restart a service process |
 | `scale_up {service}` | Add service replicas |
 | `rollback_deploy {service}` | Roll back to previous version |
+| `kill_process {service}` | Kill a process by PID (use parameters: {"pid": "1234"}) |
 | `check_process_list {service}` | View running processes (detects malware) |
 | `check_network {service}` | View network connections (detects exfiltration) |
 | `submit_root_cause {description}` | Declare diagnosis (ends episode) |

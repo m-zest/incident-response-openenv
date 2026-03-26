@@ -39,6 +39,7 @@ class SimulatedCluster:
         self.fix_action = scenario["fix_action"]
         self.fix_target = scenario["fix_target"]
         self.special_fix = scenario.get("special_fix", None)
+        self.malicious_pid = scenario.get("malicious_pid", None)
         self.restart_temporary = scenario.get("restart_temporary", False)
         self.restart_revert_steps = scenario.get("restart_revert_steps", 0)
 
@@ -92,6 +93,8 @@ class SimulatedCluster:
             return self._scale_up(target, parameters)
         elif command == "rollback_deploy":
             return self._rollback_deploy(target)
+        elif command == "kill_process":
+            return self._kill_process(target, parameters)
         elif command == "check_process_list":
             return self._check_process_list(target)
         elif command == "check_network":
@@ -99,7 +102,7 @@ class SimulatedCluster:
         elif command == "submit_root_cause":
             return self._submit_root_cause(target, parameters)
         else:
-            return f"ERROR: Unknown command '{command}'. Use list_alerts, check_logs, get_metrics, check_dependencies, restart_service, scale_up, rollback_deploy, check_process_list, check_network, or submit_root_cause."
+            return f"ERROR: Unknown command '{command}'. Use list_alerts, check_logs, get_metrics, check_dependencies, restart_service, scale_up, rollback_deploy, kill_process, check_process_list, check_network, or submit_root_cause."
 
     def _check_logs(self, service: str, parameters: dict) -> str:
         if service not in self.services:
@@ -237,6 +240,51 @@ class SimulatedCluster:
                 f"Rolled back {service} to previous version.\n"
                 f"No significant effect. System health: {self.health:.0f}%"
             )
+
+    def _kill_process(self, service: str, parameters: dict) -> str:
+        if service not in self.services:
+            return f"ERROR: Service '{service}' not found."
+        # Extract PID from parameters or target
+        pid = str(parameters.get("pid", ""))
+        if not pid:
+            return "ERROR: No PID specified. Usage: kill_process {service} with parameters: {\"pid\": \"1234\"}"
+
+        # Check if this is the malicious process
+        if self.malicious_pid and pid == str(self.malicious_pid) and service == self.fix_target:
+            # Remove the malicious process from the process list
+            procs = self.services[service].get("processes", [])
+            self.services[service]["processes"] = [
+                p for p in procs if f"PID {pid}" not in p
+            ]
+            # Remove suspicious network connections (external IPs)
+            net = self.services[service].get("network", [])
+            self.services[service]["network"] = [
+                n for n in net if "10.0.1." in n.split("->")[-1] or "LISTEN" in n
+            ]
+            self.services[service]["healthy"] = True
+            self.services[service]["status"] = "healthy"
+            old_health = self.health
+            self.health = self.health_on_fix
+            self.resolved = True
+            self.restart_temporary = False  # Malware killed, no respawn
+            self.alerts = [a for a in self.alerts if a["service"] != service]
+            return (
+                f"Killed process PID {pid} on {service}.\n"
+                f"System health: {old_health:.0f}% -> {self.health:.0f}%\n"
+                f"Malicious process terminated. Service restored."
+            )
+        else:
+            # Killing a legitimate process is destructive
+            found = any(f"PID {pid}" in p for p in self.services[service].get("processes", []))
+            if found:
+                self.destructive_actions += 1
+                return (
+                    f"Killed process PID {pid} on {service}.\n"
+                    f"WARNING: Killed a legitimate process. Service may be degraded.\n"
+                    f"System health: {self.health:.0f}%"
+                )
+            else:
+                return f"ERROR: Process PID {pid} not found on {service}."
 
     def _check_process_list(self, service: str) -> str:
         if service not in self.services:
