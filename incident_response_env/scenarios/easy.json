@@ -65,6 +65,10 @@
       "log-server": []
     },
     "health_on_fix": 95,
+    "noise_alerts": [
+      {"service": "worker-queue", "severity": "info", "message": "Scheduled backup running, temporary I/O spike", "auto_resolve_after": 2},
+      {"service": "frontend", "severity": "info", "message": "Auto-scaling check completed, no action needed", "auto_resolve_after": 3}
+    ],
     "runbook": [
       "1. Check disk usage: get_metrics log-server",
       "2. Review log volume: check_logs log-server",
@@ -126,6 +130,9 @@
       "api-gateway": ["worker-queue", "user-service"]
     },
     "health_on_fix": 92,
+    "noise_alerts": [
+      {"service": "cache-redis", "severity": "info", "message": "Memory defragmentation in progress", "auto_resolve_after": 2}
+    ],
     "runbook": [
       "1. Check worker status: check_logs worker-queue",
       "2. Review process state: check_process_list worker-queue",
@@ -194,6 +201,10 @@
       "api-gateway": ["user-service", "payment-service", "database-primary"]
     },
     "health_on_fix": 93,
+    "noise_alerts": [
+      {"service": "database-primary", "severity": "info", "message": "Routine vacuum operation running", "auto_resolve_after": 2},
+      {"service": "cache-redis", "severity": "info", "message": "Key eviction rate normal, no action required", "auto_resolve_after": 3}
+    ],
     "runbook": [
       "1. Check error rates: check_logs api-gateway",
       "2. Identify deployment: check_logs api-gateway (look for version info)",
@@ -247,6 +258,9 @@
       "api-gateway": ["user-service"]
     },
     "health_on_fix": 94,
+    "noise_alerts": [
+      {"service": "log-server", "severity": "info", "message": "Log rotation completed successfully", "auto_resolve_after": 2}
+    ],
     "runbook": [
       "1. Check memory trend: get_metrics user-service",
       "2. Review memory logs: check_logs user-service",
@@ -298,6 +312,9 @@
       "api-gateway": ["payment-service"]
     },
     "health_on_fix": 96,
+    "noise_alerts": [
+      {"service": "config-server", "severity": "info", "message": "Configuration sync check passed", "auto_resolve_after": 3}
+    ],
     "runbook": [
       "1. Check TLS status: check_logs payment-service",
       "2. Verify certificate: get_metrics payment-service",

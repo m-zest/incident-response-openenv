@@ -117,6 +117,19 @@ class SimulatedCluster:
 
         self.dependencies = dict(scenario.get("dependencies", {}))
         self.alerts = [dict(a) for a in scenario["alerts"]]
+
+        # Red herring noise alerts (auto-resolve after N steps)
+        self._noise_alerts = []
+        for na in scenario.get("noise_alerts", []):
+            alert = dict(na)
+            alert["_ttl"] = alert.pop("auto_resolve_after", 3)
+            self.alerts.append({
+                "service": alert["service"],
+                "alert_type": alert.get("alert_type", "noise"),
+                "severity": alert["severity"].lower(),
+                "message": alert["message"],
+            })
+            self._noise_alerts.append(alert)
         self.resolved = False
         self.root_cause_found = False
         self.submitted_root_cause = ""
@@ -536,6 +549,14 @@ class SimulatedCluster:
         """Called each step. Handles malware respawn AND progressive degradation."""
         self._current_step += 1
         self._log_gen.advance()
+
+        # Auto-resolve noise alerts
+        for na in self._noise_alerts:
+            na["_ttl"] -= 1
+            if na["_ttl"] <= 0:
+                self.alerts = [a for a in self.alerts
+                               if not (a["service"] == na["service"] and a["message"] == na["message"])]
+        self._noise_alerts = [na for na in self._noise_alerts if na["_ttl"] > 0]
 
         # Malware respawn logic
         if self.restart_temporary and self.steps_since_restart >= 0:
