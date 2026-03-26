@@ -127,6 +127,17 @@ python baseline.py --task hard  # or: easy, medium, expert, or omit for all
 
 `models.py` defines Pydantic types (Action, Observation, State). Scenario JSON files contain pre-built incidents with fake logs, metrics, processes, and network connections. `infrastructure.py` loads scenarios, manages the simulated cluster, processes commands, and handles time-evolving state via NetworkX dependency graphs. `grader.py` computes deterministic scores. `environment.py` orchestrates everything as an OpenEnv Environment (reset/step/state). `app.py` wraps it in FastAPI with WebSocket, REST endpoints, and the interactive web dashboard.
 
+## Future Work
+
+This environment is designed as a foundation for ongoing research. See [FUTURE_WORK.md](FUTURE_WORK.md) for the full technical roadmap.
+
+Key directions:
+- **Multi-agent orchestration** -- triage, diagnosis, remediation, and communication as separate specialized agents
+- **Hybrid-real infrastructure** -- actual Redis, SQLite, Nginx inside the container with chaos-engineered failures
+- **Continuous RL training pipeline** via TRL/GRPO with curriculum learning
+- **Custom scenario builder** for company-specific topologies (JSON-driven, no code changes)
+- **Cross-model benchmark leaderboard** with seed-based reproducible evaluation
+
 ## Tests
 
 ```bash
