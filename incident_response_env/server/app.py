@@ -6,7 +6,7 @@ the hackathon-required endpoints: /tasks, /grader, /baseline, /web.
 """
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from openenv.core.env_server import create_fastapi_app
 
@@ -23,10 +23,10 @@ env = SREEnvironment()
 # ── API Endpoints ──────────────────────────────────────────────────────────
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 async def root():
-    """Redirect root to the web dashboard."""
-    return RedirectResponse(url="/web")
+    """Serve the dashboard at root — no redirect flicker."""
+    return DASHBOARD_HTML
 
 
 @app.get("/health")
