@@ -408,6 +408,7 @@ a{color:var(--accent);text-decoration:none}
       <div class="tab active" onclick="switchTab('dashboard')">Dashboard</div>
       <div class="tab" onclick="switchTab('servicemap')">Service Map</div>
       <div class="tab" onclick="switchTab('postmortem')">Post-Mortem</div>
+      <div class="tab" onclick="switchTab('baseline')">Baseline</div>
     </div>
     <!-- Dashboard tab -->
     <div id="tab-dashboard" class="tab-content active">
@@ -527,6 +528,12 @@ a{color:var(--accent);text-decoration:none}
     <div id="tab-postmortem" class="tab-content" style="flex-direction:column">
       <div id="pm-content" class="pm-wrap">
         <div class="empty" style="padding:80px 0">Complete an episode to view the post-mortem report.</div>
+      </div>
+    </div>
+    <!-- Baseline tab -->
+    <div id="tab-baseline" class="tab-content" style="flex-direction:column">
+      <div id="bl-content" class="pm-wrap">
+        <div class="empty" style="padding:80px 0">Loading baseline data...</div>
       </div>
     </div>
   </div>
@@ -857,12 +864,14 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t,i) => {
-    t.classList.toggle('active', ['dashboard','servicemap','postmortem'][i] === name);
+  var tabs = ['dashboard','servicemap','postmortem','baseline'];
+  document.querySelectorAll('.tab').forEach(function(t,i) {
+    t.classList.toggle('active', tabs[i] === name);
   });
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
   $('tab-' + name).classList.add('active');
   if (name === 'postmortem') loadPostmortem();
+  if (name === 'baseline') loadBaseline();
 }
 
 function updateServiceMap(alerts) {
@@ -904,6 +913,62 @@ async function loadPostmortem() {
     }
     $('pm-content').innerHTML = h;
   } catch(e) { $('pm-content').innerHTML = '<div class="empty" style="padding:80px 0">Error loading post-mortem.</div>'; }
+}
+
+var _blChart = null;
+async function loadBaseline() {
+  try {
+    var res = await fetch('/baseline');
+    var d = await res.json();
+    var s = d.scores;
+    var tiers = [
+      {name:'Easy',   k:'easy',   ai:s.easy.ai,   human:s.easy.human,   n:s.easy.scenarios,   gap:(s.easy.human-s.easy.ai).toFixed(2),     status:'Manageable', color:'var(--green)'},
+      {name:'Medium', k:'medium', ai:s.medium.ai, human:s.medium.human, n:s.medium.scenarios, gap:(s.medium.human-s.medium.ai).toFixed(2), status:'Challenging',color:'var(--yellow)'},
+      {name:'Hard',   k:'hard',   ai:s.hard.ai,   human:s.hard.human,   n:s.hard.scenarios,   gap:(s.hard.human-s.hard.ai).toFixed(2),     status:'Very Hard',  color:'var(--orange)'},
+      {name:'Expert', k:'expert', ai:s.expert.ai, human:s.expert.human, n:s.expert.scenarios, gap:(s.expert.human-s.expert.ai).toFixed(2), status:'Unsolved',   color:'var(--red)'}
+    ];
+    var h = '<div class="pm-title">Baseline Performance -- Human vs AI</div>';
+    h += '<p style="color:var(--text-muted);font-size:12px;margin-bottom:20px">Tested with ' + d.model + '</p>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px">';
+    h += '<tr style="border-bottom:1px solid rgba(255,255,255,.08);color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">';
+    h += '<th style="padding:8px 0;text-align:left">Tier</th><th>Scenarios</th><th>AI Score</th><th>Human Score</th><th>Gap</th><th style="text-align:right">Status</th></tr>';
+    tiers.forEach(function(t) {
+      h += '<tr style="border-bottom:1px solid rgba(255,255,255,.04)">';
+      h += '<td style="padding:10px 0;font-weight:600;color:var(--text-bright)">' + t.name + '</td>';
+      h += '<td style="text-align:center;font-family:var(--mono);color:var(--text-dim)">' + t.n + '</td>';
+      h += '<td style="text-align:center;font-family:var(--mono);color:var(--accent)">' + t.ai.toFixed(2) + '</td>';
+      h += '<td style="text-align:center;font-family:var(--mono);color:var(--cyan)">' + t.human.toFixed(2) + '</td>';
+      h += '<td style="text-align:center;font-family:var(--mono);color:var(--text)">' + t.gap + '</td>';
+      h += '<td style="text-align:right"><span style="color:' + t.color + '">&bull;</span> <span style="color:var(--text-dim);font-size:12px">' + t.status + '</span></td>';
+      h += '</tr>';
+    });
+    h += '</table>';
+    h += '<p style="color:var(--text-dim);font-size:12px;margin-bottom:6px">Total scenarios: ' + d.total_scenarios + '</p>';
+    h += '<p style="color:var(--text-dim);font-size:12px;margin-bottom:24px">' + (d.note || '') + '</p>';
+    h += '<div style="max-width:500px;height:220px;margin:0 auto"><canvas id="bl-chart"></canvas></div>';
+    $('bl-content').innerHTML = h;
+    // Render chart
+    var ctx2 = document.getElementById('bl-chart').getContext('2d');
+    if (_blChart) _blChart.destroy();
+    _blChart = new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: ['Easy','Medium','Hard','Expert'],
+        datasets: [
+          { label: 'AI', data: tiers.map(function(t){return t.ai;}), backgroundColor: 'rgba(139,92,246,.7)', borderRadius: 4 },
+          { label: 'Human', data: tiers.map(function(t){return t.human;}), backgroundColor: 'rgba(34,211,238,.7)', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#6B7280', font: { size: 11 } } } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#6B7280' } },
+          y: { min: 0, max: 1, grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#6B7280', callback: function(v){ return v.toFixed(1); } } }
+        }
+      }
+    });
+  } catch(e) { $('bl-content').innerHTML = '<div class="empty" style="padding:80px 0">Error loading baseline data.</div>'; }
 }
 </script>
 </body>
