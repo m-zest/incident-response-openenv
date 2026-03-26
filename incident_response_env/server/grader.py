@@ -60,6 +60,12 @@ def compute_step_reward(
         else:
             reward += 0.01
 
+    # Killing a process
+    elif command == "kill_process":
+        if is_correct_fix:
+            reward += 0.25  # Correct remediation (killed malicious process)
+        # Penalty for killing legitimate processes handled via destructive_actions
+
     # Submitting root cause
     elif command == "submit_root_cause":
         if is_root_cause_correct:

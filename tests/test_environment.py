@@ -146,7 +146,7 @@ class TestEnvironment:
 
     def test_all_tasks_loadable(self):
         env = SREEnvironment()
-        for task_id in ["easy", "medium", "hard"]:
+        for task_id in ["easy", "medium", "hard", "expert"]:
             obs = env.reset(task_id=task_id, scenario_index=0)
             assert obs.system_health > 0
             assert len(obs.alerts) > 0
@@ -154,10 +154,11 @@ class TestEnvironment:
     def test_tasks_endpoint(self):
         env = SREEnvironment()
         tasks = env.get_tasks()
-        assert len(tasks) == 3
+        assert len(tasks) == 4
         assert tasks[0]["id"] == "easy"
         assert tasks[1]["id"] == "medium"
         assert tasks[2]["id"] == "hard"
+        assert tasks[3]["id"] == "expert"
 
     def test_grader_endpoint_before_done(self):
         env = SREEnvironment()

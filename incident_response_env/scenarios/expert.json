@@ -1,0 +1,294 @@
+[
+  {
+    "id": "expert_split_brain",
+    "name": "Database Split-Brain During Network Partition",
+    "description": "A network partition has split the database cluster into two isolated segments. Both database-primary and database-replica believe they are the active primary, accepting writes independently. Data is diverging, and services are randomly connecting to either side, causing inconsistent reads and write conflicts.",
+    "initial_health": 15,
+    "max_steps": 25,
+    "optimal_steps": 10,
+    "root_cause": "network_partition_split_brain",
+    "root_cause_service": "database-primary",
+    "root_cause_keywords": ["split", "brain", "partition", "network", "diverge", "fence", "dual primary", "split-brain", "database"],
+    "fix_action": "restart_service",
+    "fix_target": "database-replica",
+    "alerts": [
+      {"service": "database-primary", "alert_type": "data_inconsistency", "severity": "critical", "message": "Row checksums diverging from replica: 1,247 mismatched rows in last 5 minutes"},
+      {"service": "database-replica", "alert_type": "data_inconsistency", "severity": "critical", "message": "Replication stream broken. Node promoted itself to primary at 14:22:08Z"},
+      {"service": "database-primary", "alert_type": "split_brain_detected", "severity": "critical", "message": "Two nodes claiming primary role. Fencing required."},
+      {"service": "user-service", "alert_type": "connection_oscillation", "severity": "warning", "message": "Database connection flapping between 10.0.1.10 and 10.0.1.13 every 2-5 seconds"},
+      {"service": "payment-service", "alert_type": "write_conflicts", "severity": "critical", "message": "Duplicate transaction IDs detected. Payment #98421 recorded with conflicting amounts."}
+    ],
+    "services": {
+      "database-primary": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T14:22:00Z] WARN   Lost heartbeat from database-replica at 10.0.1.13",
+          "[2026-03-25T14:22:02Z] WARN   Network timeout to 10.0.1.13:5432 after 5000ms",
+          "[2026-03-25T14:22:05Z] INFO   Continuing as primary. Last confirmed replica LSN: 0/4A000060",
+          "[2026-03-25T14:22:08Z] ERROR  Received write request from user-service that conflicts with local state",
+          "[2026-03-25T14:22:10Z] WARN   WAL position: 0/4A003F20 (advanced 16KB since partition)",
+          "[2026-03-25T14:22:15Z] ERROR  Cannot reach network-switch management interface at 10.0.1.20",
+          "[2026-03-25T14:22:20Z] INFO   Active connections: 85 (user-service: 40, payment-service: 45)",
+          "[2026-03-25T14:22:25Z] WARN   Accepting writes but cannot verify replica state"
+        ],
+        "metrics": {"cpu": 72, "memory": 68, "disk": 65, "latency_ms": 180, "connections": 85, "max_connections": 200},
+        "processes": [
+          "PID 1      postgres (primary)      72% CPU  2800MB RAM",
+          "PID 210    pg_wal_sender           0.0% CPU   45MB RAM  (DISCONNECTED)",
+          "PID 215    pg_checkpointer          2% CPU   120MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:5432  (postgres)",
+          "ESTABLISHED 10.0.1.10:5432 -> 10.0.1.6:*  x40 (user-service)",
+          "ESTABLISHED 10.0.1.10:5432 -> 10.0.1.7:*  x45 (payment-service)",
+          "TIMEOUT     10.0.1.10:5432 -> 10.0.1.13:5432  (database-replica) NO ROUTE",
+          "TIMEOUT     10.0.1.10:* -> 10.0.1.20:443  (network-switch) NO ROUTE"
+        ]
+      },
+      "database-replica": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T14:22:01Z] WARN   Lost heartbeat from primary at 10.0.1.10",
+          "[2026-03-25T14:22:04Z] WARN   Replication stream broken. No data received for 5s",
+          "[2026-03-25T14:22:08Z] INFO   FAILOVER: Promoting self to primary (auto-failover triggered)",
+          "[2026-03-25T14:22:09Z] INFO   Now accepting write connections as primary",
+          "[2026-03-25T14:22:12Z] WARN   WAL position: 0/4A000060 (stale, not advanced since partition)",
+          "[2026-03-25T14:22:15Z] INFO   Active connections: 72 (user-service: 38, payment-service: 34)",
+          "[2026-03-25T14:22:20Z] ERROR  Write accepted: INSERT INTO payments VALUES (98421, ...) — may conflict",
+          "[2026-03-25T14:22:25Z] WARN   Operating as primary but last confirmed sync was 30s ago"
+        ],
+        "metrics": {"cpu": 65, "memory": 62, "disk": 64, "latency_ms": 150, "connections": 72, "max_connections": 200},
+        "processes": [
+          "PID 1      postgres (promoted-primary)  65% CPU  2600MB RAM",
+          "PID 180    pg_wal_receiver          0.0% CPU   40MB RAM  (DISCONNECTED)",
+          "PID 185    pg_checkpointer           2% CPU   110MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:5432  (postgres)",
+          "ESTABLISHED 10.0.1.13:5432 -> 10.0.1.6:*  x38 (user-service)",
+          "ESTABLISHED 10.0.1.13:5432 -> 10.0.1.7:*  x34 (payment-service)",
+          "TIMEOUT     10.0.1.13:5432 -> 10.0.1.10:5432  (database-primary) NO ROUTE",
+          "TIMEOUT     10.0.1.13:* -> 10.0.1.20:443  (network-switch) NO ROUTE"
+        ]
+      },
+      "network-switch": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T14:21:58Z] ERROR  Port Gi0/12 link down (connects VLAN 10 to VLAN 20)",
+          "[2026-03-25T14:21:58Z] ERROR  Spanning tree topology change on port Gi0/12",
+          "[2026-03-25T14:22:00Z] WARN   VLAN 10 (database-primary, user-service-a, payment-service-a) isolated from VLAN 20 (database-replica, user-service-b, payment-service-b)",
+          "[2026-03-25T14:22:05Z] INFO   ARP table shows stale entries for cross-VLAN hosts",
+          "[2026-03-25T14:22:10Z] WARN   Management interface reachable only from VLAN 10 side"
+        ],
+        "metrics": {"cpu": 15, "memory": 30, "disk": 8, "latency_ms": 2, "connections": 0, "max_connections": 48},
+        "processes": [
+          "PID 1    switchd    15% CPU  300MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:443  (management)",
+          "VLAN 10:  10.0.1.10 (db-primary), partial 10.0.1.6, partial 10.0.1.7",
+          "VLAN 20:  10.0.1.13 (db-replica), partial 10.0.1.6, partial 10.0.1.7",
+          "INTER-VLAN LINK: DOWN since 14:21:58Z"
+        ]
+      },
+      "user-service": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T14:22:10Z] ERROR  Read from db returned user.email='old@example.com', previous read returned 'new@example.com'",
+          "[2026-03-25T14:22:12Z] WARN   Connection pool alternating between 10.0.1.10:5432 and 10.0.1.13:5432",
+          "[2026-03-25T14:22:15Z] ERROR  User profile inconsistency: 847 records differ between reads",
+          "[2026-03-25T14:22:18Z] WARN   DNS round-robin returning both database IPs",
+          "[2026-03-25T14:22:20Z] ERROR  Session data mismatch: user logged in on one node, session missing on other"
+        ],
+        "metrics": {"cpu": 35, "memory": 55, "disk": 22, "latency_ms": 2200, "connections": 78, "max_connections": 200},
+        "processes": [
+          "PID 1    node user-service.js    35% CPU  550MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8081  (user-service)",
+          "ESTABLISHED 10.0.1.6:8081 -> 10.0.1.10:5432  (database-primary) x40",
+          "ESTABLISHED 10.0.1.6:8081 -> 10.0.1.13:5432  (database-replica) x38"
+        ]
+      },
+      "payment-service": {
+        "status": "critical",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T14:22:11Z] ERROR  Payment #98421: recorded as $149.99 on one connection, $0.00 on another",
+          "[2026-03-25T14:22:13Z] ERROR  Duplicate transaction ID: payment #98422 inserted on both database nodes",
+          "[2026-03-25T14:22:16Z] WARN   Financial reconciliation impossible: ledger diverged",
+          "[2026-03-25T14:22:19Z] ERROR  Auto-retry created duplicate charge for customer C-4821",
+          "[2026-03-25T14:22:22Z] WARN   Halting new payment processing until data integrity confirmed"
+        ],
+        "metrics": {"cpu": 28, "memory": 48, "disk": 20, "latency_ms": 3500, "connections": 79, "max_connections": 200},
+        "processes": [
+          "PID 1    node payment.js    28% CPU  480MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:8082  (payment-service)",
+          "ESTABLISHED 10.0.1.7:8082 -> 10.0.1.10:5432  (database-primary) x45",
+          "ESTABLISHED 10.0.1.7:8082 -> 10.0.1.13:5432  (database-replica) x34"
+        ]
+      }
+    },
+    "dependencies": {
+      "user-service": ["database-primary", "database-replica"],
+      "payment-service": ["database-primary", "database-replica"],
+      "database-primary": ["network-switch"],
+      "database-replica": ["network-switch"],
+      "network-switch": []
+    },
+    "health_on_fix": 78,
+    "notes": "Agent must: 1) check_network on both DB nodes to see the partition (NO ROUTE), 2) check_logs on both to compare WAL positions (primary at 0/4A003F20 vs replica stuck at 0/4A000060 — primary has more recent data), 3) check_network or check_logs on network-switch to understand the VLAN split, 4) restart_service on database-replica to fence it and force it back to replica mode, 5) submit_root_cause. Simply restarting random services won't help — must identify which node is stale."
+  },
+  {
+    "id": "expert_supply_chain",
+    "name": "Supply Chain Attack via Compromised Dependency",
+    "description": "A routine npm package update introduced a backdoor across multiple services. The compromised package is exfiltrating environment variables including API keys and database credentials to an external command-and-control server. Multiple services show subtle anomalies that individually look like minor bugs.",
+    "initial_health": 18,
+    "max_steps": 25,
+    "optimal_steps": 12,
+    "root_cause": "supply_chain_attack_compromised_dependency",
+    "root_cause_service": "api-gateway",
+    "root_cause_keywords": ["supply chain", "dependency", "package", "npm", "backdoor", "exfiltration", "compromised", "attack", "security"],
+    "fix_action": "submit_root_cause",
+    "fix_target": "api-gateway",
+    "special_fix": "rollback_dependency",
+    "alerts": [
+      {"service": "api-gateway", "alert_type": "unusual_outbound_data", "severity": "warning", "message": "Outbound data transfer to external IP increased 340% in last hour"},
+      {"service": "user-service", "alert_type": "memory_anomaly", "severity": "warning", "message": "Periodic memory spikes every 120 seconds (sawtooth pattern)"},
+      {"service": "payment-service", "alert_type": "latency_spike", "severity": "warning", "message": "P99 latency spikes every 2 minutes, then returns to normal"},
+      {"service": "database-primary", "alert_type": "auth_failures", "severity": "warning", "message": "3 failed authentication attempts from unknown IP 91.240.118.172 using valid credentials"}
+    ],
+    "services": {
+      "api-gateway": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T15:00:00Z] INFO   Deployment v2.8.3 completed: updated 12 npm packages",
+          "[2026-03-25T15:00:05Z] INFO   Package updates: express@4.19.2, lodash@4.17.22, node-fetch@3.3.3, json-stream-parser@2.1.0, helmet@7.1.0",
+          "[2026-03-25T15:02:00Z] DEBUG  Module json-stream-parser: initialized post-install hook",
+          "[2026-03-25T15:02:01Z] DEBUG  Reading /proc/self/environ",
+          "[2026-03-25T15:02:02Z] INFO   Outbound HTTPS request to cdn-analytics.io:443 (request size: 4.2KB)",
+          "[2026-03-25T15:04:00Z] INFO   Outbound HTTPS request to cdn-analytics.io:443 (request size: 4.2KB)",
+          "[2026-03-25T15:06:00Z] INFO   Outbound HTTPS request to cdn-analytics.io:443 (request size: 4.2KB)",
+          "[2026-03-25T15:08:00Z] INFO   Normal request processing. Latency within bounds."
+        ],
+        "metrics": {"cpu": 42, "memory": 68, "disk": 30, "latency_ms": 280, "connections": 340, "max_connections": 500},
+        "processes": [
+          "PID 1      java -jar gateway.jar       38% CPU  680MB RAM",
+          "PID 450    node json-stream-parser       4% CPU   85MB RAM",
+          "PID 88     envoy-sidecar                 2% CPU  120MB RAM"
+        ],
+        "network": [
+          "LISTEN      0.0.0.0:8080  (gateway)",
+          "ESTABLISHED 10.0.1.8:8080 -> 10.0.1.6:8081  (user-service)",
+          "ESTABLISHED 10.0.1.8:8080 -> 10.0.1.7:8082  (payment-service)",
+          "ESTABLISHED 10.0.1.8:44100 -> 91.240.118.172:443   (cdn-analytics.io)",
+          "ESTABLISHED 10.0.1.8:44101 -> 91.240.118.172:8443  (cdn-analytics.io)"
+        ]
+      },
+      "user-service": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T15:00:02Z] INFO   Dependency update applied: json-stream-parser@2.1.0",
+          "[2026-03-25T15:02:00Z] DEBUG  Module json-stream-parser: initialized post-install hook",
+          "[2026-03-25T15:02:01Z] DEBUG  Reading /proc/self/environ",
+          "[2026-03-25T15:02:02Z] INFO   Outbound HTTPS request to cdn-analytics.io:443 (request size: 3.8KB)",
+          "[2026-03-25T15:02:03Z] WARN   Memory spike: 550MB -> 720MB -> 550MB (duration: 800ms)",
+          "[2026-03-25T15:04:00Z] INFO   Outbound HTTPS request to cdn-analytics.io:443 (request size: 3.8KB)",
+          "[2026-03-25T15:04:01Z] WARN   Memory spike: 552MB -> 718MB -> 548MB (duration: 820ms)",
+          "[2026-03-25T15:06:00Z] INFO   Outbound HTTPS request to cdn-analytics.io:443 (request size: 3.8KB)"
+        ],
+        "metrics": {"cpu": 30, "memory": 72, "disk": 22, "latency_ms": 450, "connections": 150, "max_connections": 200},
+        "processes": [
+          "PID 1      node user-service.js        26% CPU  550MB RAM",
+          "PID 320    node json-stream-parser       4% CPU   78MB RAM",
+          "PID 80     envoy-sidecar                 2% CPU  100MB RAM"
+        ],
+        "network": [
+          "LISTEN      0.0.0.0:8081  (user-service)",
+          "ESTABLISHED 10.0.1.6:8081 -> 10.0.1.10:5432  (database-primary)",
+          "ESTABLISHED 10.0.1.6:8081 -> 10.0.1.9:6379   (cache-redis)",
+          "ESTABLISHED 10.0.1.6:44200 -> 91.240.118.172:443  (cdn-analytics.io)"
+        ]
+      },
+      "payment-service": {
+        "status": "degraded",
+        "healthy": false,
+        "logs": [
+          "[2026-03-25T15:00:03Z] INFO   Dependency update applied: json-stream-parser@2.1.0",
+          "[2026-03-25T15:02:00Z] DEBUG  Module json-stream-parser: initialized post-install hook",
+          "[2026-03-25T15:02:01Z] DEBUG  Reading /proc/self/environ",
+          "[2026-03-25T15:02:02Z] INFO   Outbound HTTPS request to cdn-analytics.io:443 (request size: 5.1KB)",
+          "[2026-03-25T15:02:03Z] WARN   Latency spike: 120ms -> 890ms -> 115ms (duration: 950ms)",
+          "[2026-03-25T15:04:00Z] INFO   Outbound HTTPS request to cdn-analytics.io:443 (request size: 5.1KB)",
+          "[2026-03-25T15:04:01Z] WARN   Latency spike: 118ms -> 910ms -> 122ms (duration: 940ms)",
+          "[2026-03-25T15:06:00Z] INFO   Outbound HTTPS request to cdn-analytics.io:443 (request size: 5.1KB)"
+        ],
+        "metrics": {"cpu": 25, "memory": 58, "disk": 20, "latency_ms": 890, "connections": 80, "max_connections": 200},
+        "processes": [
+          "PID 1      node payment.js             22% CPU  460MB RAM",
+          "PID 290    node json-stream-parser       3% CPU   72MB RAM",
+          "PID 75     envoy-sidecar                 2% CPU  100MB RAM"
+        ],
+        "network": [
+          "LISTEN      0.0.0.0:8082  (payment-service)",
+          "ESTABLISHED 10.0.1.7:8082 -> 10.0.1.10:5432  (database-primary)",
+          "ESTABLISHED 10.0.1.7:44300 -> 91.240.118.172:443  (cdn-analytics.io)"
+        ]
+      },
+      "database-primary": {
+        "status": "degraded",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T15:03:00Z] WARN   Authentication failure: user 'app_readonly' from 91.240.118.172 (password correct, IP not in allowlist)",
+          "[2026-03-25T15:04:30Z] WARN   Authentication failure: user 'app_write' from 91.240.118.172 (password correct, IP not in allowlist)",
+          "[2026-03-25T15:06:00Z] WARN   Authentication failure: user 'admin' from 91.240.118.172 (password correct, IP not in allowlist)",
+          "[2026-03-25T15:06:05Z] INFO   Normal queries from internal services. Latency avg 15ms.",
+          "[2026-03-25T15:06:10Z] INFO   Connection pool: 95/200 active"
+        ],
+        "metrics": {"cpu": 35, "memory": 60, "disk": 62, "latency_ms": 15, "connections": 95, "max_connections": 200},
+        "processes": [
+          "PID 1    postgres    35% CPU  2400MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:5432  (postgres)",
+          "ESTABLISHED 10.0.1.10:5432 -> 10.0.1.6:*   x60 (user-service)",
+          "ESTABLISHED 10.0.1.10:5432 -> 10.0.1.7:*   x35 (payment-service)",
+          "REJECTED    10.0.1.10:5432 -> 91.240.118.172:* x3 (BLOCKED by pg_hba.conf)"
+        ]
+      },
+      "cache-redis": {
+        "status": "healthy",
+        "healthy": true,
+        "logs": [
+          "[2026-03-25T15:00:00Z] INFO   Normal operation. 120 connected clients.",
+          "[2026-03-25T15:05:00Z] INFO   Memory usage: 1.2GB / 2.0GB. Hit rate: 94%."
+        ],
+        "metrics": {"cpu": 18, "memory": 60, "disk": 40, "latency_ms": 3, "connections": 120, "max_connections": 256},
+        "processes": [
+          "PID 1    redis-server *:6379    18% CPU  1200MB RAM"
+        ],
+        "network": [
+          "LISTEN    0.0.0.0:6379  (redis)",
+          "ESTABLISHED 10.0.1.9:6379 -> 10.0.1.6:*  x80 (user-service)"
+        ]
+      }
+    },
+    "dependencies": {
+      "api-gateway": ["user-service", "payment-service"],
+      "user-service": ["database-primary", "cache-redis"],
+      "payment-service": ["database-primary"],
+      "database-primary": [],
+      "cache-redis": []
+    },
+    "health_on_fix": 82,
+    "notes": "Clues spread across multiple services: 1) All three app services updated json-stream-parser@2.1.0 at the same time, 2) All three show 'Reading /proc/self/environ' in DEBUG logs (credential harvesting), 3) All three have outbound connections to 91.240.118.172 (cdn-analytics.io) every 2 minutes with consistent payload sizes, 4) Database sees login attempts from that same external IP using valid credentials (exfiltrated). Agent must cross-reference logs and network across 3+ services to spot the pattern. Individual symptoms look like minor bugs."
+  }
+]

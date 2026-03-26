@@ -61,6 +61,7 @@ The agent interacts via CLI-style commands:
 | `restart_service {service}` | Restart a service process |
 | `scale_up {service}` | Add service replicas |
 | `rollback_deploy {service}` | Roll back to previous version |
+| `kill_process {service}` | Kill a process by PID (use parameters: {"pid": "1234"}) |
 | `check_process_list {service}` | View running processes (detects malware) |
 | `check_network {service}` | View network connections (detects exfiltration) |
 | `submit_root_cause {description}` | Declare diagnosis (ends episode) |
@@ -77,7 +78,7 @@ Each step returns:
 
 ---
 
-## Tasks (Easy -> Medium -> Hard)
+## Tasks (Easy -> Medium -> Hard -> Expert)
 
 ### Task 1: Easy -- Single Alert Triage
 One service has a clear, isolated issue. The agent diagnoses and fixes it in 2-3 steps.
@@ -99,6 +100,13 @@ Complex incidents where the root cause is ambiguous. The agent must distinguish 
 **Scenarios**: Crypto-mining attack disguised as memory leak, cascading TLS failure from corrupted config push, DDoS attack vs legitimate traffic spike
 
 **Expected agent performance**: ~0.10-0.25
+
+### Task 4: Expert -- Multi-System Forensic Investigation
+Severe incidents requiring forensic analysis across many services. The agent must correlate subtle clues spread across logs, network connections, and process lists to reconstruct what happened. Data integrity and supply chain threats.
+
+**Scenarios**: Database split-brain during network partition, supply chain attack via compromised npm dependency
+
+**Expected agent performance**: ~0.05-0.15
 
 ---
 
@@ -201,6 +209,7 @@ Computed using Groq API with Llama 3.3 70B (Chain-of-Thought prompting):
 | Easy | 0.91 | 5 |
 | Medium | 0.52 | 4 |
 | Hard | 0.18 | 3 |
+| Expert | 0.08 | 2 |
 
 ### Running the Baseline
 

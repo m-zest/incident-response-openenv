@@ -19,7 +19,7 @@ class SREAction(BaseModel):
         description=(
             "The CLI command to execute. One of: "
             "check_logs, get_metrics, list_alerts, check_dependencies, "
-            "restart_service, scale_up, rollback_deploy, "
+            "restart_service, scale_up, rollback_deploy, kill_process, "
             "check_process_list, check_network, submit_root_cause"
         ),
     )
@@ -69,6 +69,7 @@ class SREObservation(BaseModel):
             "restart_service {service}",
             "scale_up {service}",
             "rollback_deploy {service}",
+            "kill_process {service} (parameters: {pid})",
             "check_process_list {service}",
             "check_network {service}",
             "submit_root_cause {description}",

@@ -59,6 +59,7 @@ Available commands:
 - restart_service {service}
 - scale_up {service}
 - rollback_deploy {service}
+- kill_process {service} — Kill a specific process by PID. Pass PID in parameters: {"pid": "1234"}
 - check_process_list {service}
 - check_network {service}
 - submit_root_cause {description} — Put your diagnosis in the "target" field. This ENDS the episode.
@@ -77,10 +78,13 @@ Example 3 — rollback a bad deploy:
 Example 4 — scale up overwhelmed workers:
 {"command": "scale_up", "target": "worker-queue", "parameters": {}}
 
-Example 5 — submit root cause (AFTER fixing):
+Example 5 — kill a suspicious process:
+{"command": "kill_process", "target": "payment-service", "parameters": {"pid": "9821"}}
+
+Example 6 — submit root cause (AFTER fixing):
 {"command": "submit_root_cause", "target": "disk full on log-server causing write failures", "parameters": {}}
 
-Example 6 — submit security root cause:
+Example 7 — submit security root cause:
 {"command": "submit_root_cause", "target": "crypto mining malware attack on payment-service", "parameters": {}}
 """
 
@@ -184,7 +188,7 @@ def main():
     print()
 
     all_results = {}
-    for task_id in ["easy", "medium", "hard"]:
+    for task_id in ["easy", "medium", "hard", "expert"]:
         scenarios = env._scenarios[task_id]
         task_scores = []
 

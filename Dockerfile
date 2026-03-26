@@ -17,6 +17,7 @@ COPY baseline.py /app/baseline.py
 
 # Set Python path so imports work
 ENV PYTHONPATH=/app
+ENV ENABLE_WEB_INTERFACE=true
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
