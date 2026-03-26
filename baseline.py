@@ -188,7 +188,7 @@ def main():
     print()
 
     all_results = {}
-    for task_id in ["easy", "medium", "hard"]:
+    for task_id in ["easy", "medium", "hard", "expert"]:
         scenarios = env._scenarios[task_id]
         task_scores = []
 

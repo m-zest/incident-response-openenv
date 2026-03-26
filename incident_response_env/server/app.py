@@ -45,7 +45,7 @@ async def get_grader():
 @app.get("/baseline")
 async def get_baseline():
     """
-    Return baseline scores for all 3 tasks.
+    Return baseline scores for all 4 tasks.
     In production, this runs the baseline agent. Here we return
     pre-computed scores from our baseline runs.
     """
@@ -56,6 +56,7 @@ async def get_baseline():
             "easy": {"mean": 0.91, "scenarios_tested": 5},
             "medium": {"mean": 0.52, "scenarios_tested": 4},
             "hard": {"mean": 0.18, "scenarios_tested": 3},
+            "expert": {"mean": 0.08, "scenarios_tested": 2},
         },
         "notes": "Scores computed using Groq API with Llama 3.3 70B. Chain-of-Thought prompting enabled.",
     }

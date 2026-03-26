@@ -38,6 +38,13 @@ TASK_DEFINITIONS = [
         "difficulty": "hard",
         "max_steps": 20,
     },
+    {
+        "id": "expert",
+        "name": "Multi-System Forensic Investigation",
+        "description": "Severe infrastructure failure requiring forensic analysis across multiple services. Data integrity or supply chain compromise.",
+        "difficulty": "expert",
+        "max_steps": 25,
+    },
 ]
 
 
@@ -57,6 +64,7 @@ class SREEnvironment(Environment):
             "easy": load_scenarios("easy"),
             "medium": load_scenarios("medium"),
             "hard": load_scenarios("hard"),
+            "expert": load_scenarios("expert"),
         }
 
     def reset(self, task_id: str = "easy", scenario_index: int = -1) -> SREObservation:
