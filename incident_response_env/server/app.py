@@ -261,9 +261,15 @@ a{color:var(--accent);text-decoration:none}
   letter-spacing:.8px;color:var(--text-muted);border-bottom:1px solid var(--border);
   display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.015)}
 .card-header-icon{font-size:12px;opacity:.6}
-.card-body{padding:14px 16px;max-height:250px;min-height:40px;overflow-y:auto;font-size:12px}
-.card-body::-webkit-scrollbar{width:3px}
-.card-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.05);border-radius:2px}
+.card-body{padding:14px 16px;min-height:40px;overflow-y:auto;font-size:12px;
+  max-height:200px;scrollbar-width:thin;scrollbar-color:#333 transparent}
+.card-body::-webkit-scrollbar{width:4px}
+.card-body::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+.card-body::-webkit-scrollbar-track{background:transparent}
+.card-body.cb-alerts{max-height:200px}
+.card-body.cb-commands{max-height:280px}
+.card-body.cb-evidence{max-height:180px}
+.card-body.cb-actions{max-height:180px}
 .alert-item{display:flex;align-items:flex-start;gap:9px;padding:8px 0;
   border-bottom:1px solid rgba(255,255,255,.03);animation:fadeSlide .2s ease}
 .alert-item:last-child{border-bottom:none}
@@ -401,11 +407,11 @@ a{color:var(--accent);text-decoration:none}
       <div class="panel-right">
         <div class="card">
           <div class="card-header"><span class="card-header-icon">&#9888;</span> Active Alerts</div>
-          <div id="alerts-panel" class="card-body"><div class="empty">No active episode</div></div>
+          <div id="alerts-panel" class="card-body cb-alerts"><div class="empty">No active episode</div></div>
         </div>
         <div class="card">
           <div class="card-header"><span class="card-header-icon">&#9881;</span> Commands</div>
-          <div class="card-body" style="max-height:none;padding:4px 6px">
+          <div class="card-body cb-commands" style="padding:4px 6px">
             <div class="cmd-list-item"><span class="cmd-name">check_logs</span> <span class="cmd-arg">{service}</span></div>
             <div class="cmd-list-item"><span class="cmd-name">get_metrics</span> <span class="cmd-arg">{service}</span></div>
             <div class="cmd-list-item"><span class="cmd-name">list_alerts</span></div>
@@ -426,11 +432,11 @@ a{color:var(--accent);text-decoration:none}
         </div>
         <div class="card">
           <div class="card-header"><span class="card-header-icon">&#128270;</span> Evidence Board</div>
-          <div id="evidence-panel" class="card-body"><div class="empty">No notes yet</div></div>
+          <div id="evidence-panel" class="card-body cb-evidence"><div class="empty">No notes yet</div></div>
         </div>
         <div class="card">
           <div class="card-header"><span class="card-header-icon">&#9654;</span> Actions Taken</div>
-          <div id="actions-panel" class="card-body"><div class="empty">No actions yet</div></div>
+          <div id="actions-panel" class="card-body cb-actions"><div class="empty">No actions yet</div></div>
         </div>
       </div>
     </div>
