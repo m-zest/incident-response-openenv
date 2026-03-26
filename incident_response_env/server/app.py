@@ -175,9 +175,38 @@ a{color:var(--accent);text-decoration:none}
 .score-val{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--accent);
   animation:scoreGlow 3s ease-in-out infinite}
 .step-val{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text)}
-.main{display:flex;flex:1;overflow:hidden}
+/* Tabs */
+.tab-bar{display:flex;gap:0;padding:0 28px;background:var(--bg-elevated);
+  border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{padding:10px 20px;font-size:12px;font-weight:500;color:var(--text-muted);
+  cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;user-select:none}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-content{display:none;flex:1;overflow:hidden}
+.tab-content.active{display:flex}
+/* Service map */
+.svc-map{width:100%;padding:16px}
+.svc-map svg{width:100%}
+.svc-node{transition:fill .3s}
+.svc-label{font-family:var(--mono);font-size:10px;fill:var(--text);text-anchor:middle}
+.svc-edge{stroke:rgba(255,255,255,.1);stroke-width:1;fill:none;marker-end:url(#arrowhead)}
+/* Postmortem tab */
+.pm-wrap{flex:1;overflow-y:auto;padding:24px 32px;max-width:800px;margin:0 auto}
+.pm-title{font-size:20px;font-weight:700;color:var(--text-bright);margin-bottom:16px}
+.pm-section{margin-bottom:20px}
+.pm-section h3{font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;
+  letter-spacing:.8px;margin-bottom:8px}
+.pm-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.03);
+  font-size:13px}
+.pm-row .pm-label{color:var(--text-dim)}.pm-row .pm-val{color:var(--text);font-weight:500;font-family:var(--mono)}
+.pm-timeline-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:12px}
+.pm-step-num{color:var(--accent);font-weight:700;font-family:var(--mono);min-width:32px}
+.pm-action{color:var(--cyan);font-family:var(--mono)}.pm-finding{color:var(--text-dim)}
+.main{display:flex;flex-direction:column;flex:1;overflow:hidden}
+.main-inner{display:flex;flex:1;overflow:hidden}
 .panel-left{flex:0 0 62%;display:flex;flex-direction:column;padding:12px 0 12px 12px}
-.panel-right{flex:1;display:flex;flex-direction:column;overflow-y:auto;padding:12px;gap:10px}
+.panel-right{flex:1;display:flex;flex-direction:column;overflow-y:auto;padding:12px;gap:12px;
+  max-height:calc(100vh - 120px)}
 .panel-right::-webkit-scrollbar{width:4px}
 .panel-right::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06);border-radius:2px}
 .terminal-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;
@@ -235,7 +264,7 @@ a{color:var(--accent);text-decoration:none}
   animation:pulseGlow 2.5s infinite}
 .sev-warning{background:var(--yellow-dim);color:var(--yellow);border:1px solid rgba(251,191,36,.15)}
 .sev-info{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(139,92,246,.15)}
-.alert-text{color:var(--text);font-size:11px;line-height:1.45}
+.alert-text{color:var(--text);font-size:11px;line-height:1.45;word-break:break-word}
 .alert-svc{color:var(--text-muted);font-size:10px;font-family:var(--mono);margin-top:2px}
 .cmd-list-item{padding:5px 10px;font-family:var(--mono);font-size:10.5px;color:var(--text-dim);
   border-radius:var(--r-sm);transition:all .15s;cursor:default;line-height:1.65}
@@ -298,7 +327,7 @@ a{color:var(--accent);text-decoration:none}
   <!-- Top bar -->
   <div class="topbar">
     <div class="topbar-left">
-      <div class="topbar-logo">SR</div>
+      <div class="topbar-logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1" fill="#fff"/><circle cx="6" cy="18" r="1" fill="#fff"/></svg></div>
       <div class="topbar-text">
         <div class="topbar-title">Incident Response Simulator</div>
         <div class="topbar-sub">OpenEnv DevSecOps Environment</div>
@@ -329,65 +358,120 @@ a{color:var(--accent);text-decoration:none}
 
   <!-- Main panels -->
   <div class="main">
-    <div class="panel-left">
-      <div class="terminal-wrap">
-        <div class="terminal-titlebar">
-          <div class="terminal-dot dot-red"></div>
-          <div class="terminal-dot dot-yellow"></div>
-          <div class="terminal-dot dot-green"></div>
-          <span class="terminal-titlebar-text">sre-simulator@prod ~ $</span>
-        </div>
-        <div id="terminal" class="terminal">
-          <div class="term-welcome">
-            <h2>Welcome, On-Call Engineer</h2>
-            <p>Select a difficulty tier and click <b>New Episode</b> to begin.
-            Investigate the incident, identify the root cause, fix the system, then submit your diagnosis.</p>
-            <div class="tiers">
-              <span class="tier-tag tier-easy">Easy</span>
-              <span class="tier-tag tier-medium">Medium</span>
-              <span class="tier-tag tier-hard">Hard</span>
-              <span class="tier-tag tier-expert">Expert</span>
+    <div class="tab-bar">
+      <div class="tab active" onclick="switchTab('dashboard')">Dashboard</div>
+      <div class="tab" onclick="switchTab('servicemap')">Service Map</div>
+      <div class="tab" onclick="switchTab('postmortem')">Post-Mortem</div>
+    </div>
+    <!-- Dashboard tab -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div class="panel-left">
+        <div class="terminal-wrap">
+          <div class="terminal-titlebar">
+            <div class="terminal-dot dot-red"></div>
+            <div class="terminal-dot dot-yellow"></div>
+            <div class="terminal-dot dot-green"></div>
+            <span class="terminal-titlebar-text">incident-response @ production</span>
+          </div>
+          <div id="terminal" class="terminal">
+            <div class="term-welcome">
+              <h2>Welcome, On-Call Engineer</h2>
+              <p>Select a difficulty tier and start a new episode. Investigate alerts, trace dependencies, fix the root cause, then submit your diagnosis.</p>
+              <div class="tiers">
+                <span class="tier-tag tier-easy">Easy</span>
+                <span class="tier-tag tier-medium">Medium</span>
+                <span class="tier-tag tier-hard">Hard</span>
+                <span class="tier-tag tier-expert">Expert</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-    <div class="panel-right">
-      <div class="card">
-        <div class="card-header"><span class="card-header-icon">&#9888;</span> Active Alerts</div>
-        <div id="alerts-panel" class="card-body"><div class="empty">No active episode</div></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><span class="card-header-icon">&#128200;</span> Health Timeline</div>
-        <div class="card-body" style="max-height:160px;padding:6px 10px"><canvas id="health-chart" height="120"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><span class="card-header-icon">&#9881;</span> Commands</div>
-        <div class="card-body" style="max-height:none;padding:6px 8px">
-          <div class="cmd-list-item"><span class="cmd-name">check_logs</span> <span class="cmd-arg">{service}</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">get_metrics</span> <span class="cmd-arg">{service}</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">list_alerts</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">check_dependencies</span> <span class="cmd-arg">{service}</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">get_dependency_graph</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">trace_failure</span> <span class="cmd-arg">{service}</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">restart_service</span> <span class="cmd-arg">{service}</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">scale_up</span> <span class="cmd-arg">{service}</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">rollback_deploy</span> <span class="cmd-arg">{service}</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">kill_process</span> <span class="cmd-arg">{service} pid={PID}</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">check_process_list</span> <span class="cmd-arg">{service}</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">check_network</span> <span class="cmd-arg">{service}</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">add_note</span> <span class="cmd-arg">{observation}</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">view_notes</span></div>
-          <div class="cmd-list-item"><span class="cmd-name">submit_root_cause</span> <span class="cmd-arg">{description}</span></div>
+      <div class="panel-right">
+        <div class="card">
+          <div class="card-header"><span class="card-header-icon">&#9888;</span> Active Alerts</div>
+          <div id="alerts-panel" class="card-body"><div class="empty">No active episode</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-header-icon">&#9881;</span> Commands</div>
+          <div class="card-body" style="max-height:none;padding:4px 6px">
+            <div class="cmd-list-item"><span class="cmd-name">check_logs</span> <span class="cmd-arg">{service}</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">get_metrics</span> <span class="cmd-arg">{service}</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">list_alerts</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">check_dependencies</span> <span class="cmd-arg">{service}</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">get_dependency_graph</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">trace_failure</span> <span class="cmd-arg">{service}</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">restart_service</span> <span class="cmd-arg">{service}</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">scale_up</span> <span class="cmd-arg">{service}</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">rollback_deploy</span> <span class="cmd-arg">{service}</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">kill_process</span> <span class="cmd-arg">{service} pid=PID</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">check_process_list</span> <span class="cmd-arg">{service}</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">check_network</span> <span class="cmd-arg">{service}</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">add_note</span> <span class="cmd-arg">{text}</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">view_notes</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">submit_root_cause</span> <span class="cmd-arg">{diagnosis}</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-header-icon">&#128270;</span> Evidence Board</div>
+          <div id="evidence-panel" class="card-body"><div class="empty">No notes yet</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-header-icon">&#9654;</span> Actions Taken</div>
+          <div id="actions-panel" class="card-body"><div class="empty">No actions yet</div></div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-header"><span class="card-header-icon">&#128270;</span> Evidence Board</div>
-        <div id="evidence-panel" class="card-body"><div class="empty">No notes yet</div></div>
+    </div>
+    <!-- Service Map tab -->
+    <div id="tab-servicemap" class="tab-content" style="flex-direction:column;padding:16px;overflow-y:auto">
+      <div class="card" style="flex:none">
+        <div class="card-header"><span class="card-header-icon">&#128268;</span> Service Dependency Map</div>
+        <div class="card-body" style="max-height:none;padding:12px">
+          <div id="svc-map" class="svc-map">
+            <svg viewBox="0 0 600 280" height="260">
+              <defs><marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="rgba(255,255,255,.15)"/></marker></defs>
+              <line class="svc-edge" x1="300" y1="45" x2="300" y2="90"/>
+              <line class="svc-edge" x1="260" y1="125" x2="150" y2="170"/>
+              <line class="svc-edge" x1="340" y1="125" x2="450" y2="170"/>
+              <line class="svc-edge" x1="300" y1="125" x2="300" y2="170"/>
+              <line class="svc-edge" x1="150" y1="205" x2="100" y2="240"/>
+              <line class="svc-edge" x1="150" y1="205" x2="200" y2="240"/>
+              <line class="svc-edge" x1="300" y1="205" x2="300" y2="240"/>
+              <line class="svc-edge" x1="450" y1="205" x2="500" y2="240"/>
+              <rect id="node-frontend" class="svc-node" x="255" y="20" width="90" height="30" rx="6" fill="#374151"/>
+              <text class="svc-label" x="300" y="40">frontend</text>
+              <rect id="node-api-gateway" class="svc-node" x="240" y="95" width="120" height="30" rx="6" fill="#374151"/>
+              <text class="svc-label" x="300" y="115">api-gateway</text>
+              <rect id="node-user-service" class="svc-node" x="85" y="175" width="130" height="30" rx="6" fill="#374151"/>
+              <text class="svc-label" x="150" y="195">user-service</text>
+              <rect id="node-worker-queue" class="svc-node" x="240" y="175" width="120" height="30" rx="6" fill="#374151"/>
+              <text class="svc-label" x="300" y="195">worker-queue</text>
+              <rect id="node-payment-service" class="svc-node" x="385" y="175" width="130" height="30" rx="6" fill="#374151"/>
+              <text class="svc-label" x="450" y="195">payment-service</text>
+              <rect id="node-cache-redis" class="svc-node" x="40" y="240" width="120" height="30" rx="6" fill="#374151"/>
+              <text class="svc-label" x="100" y="260">cache-redis</text>
+              <rect id="node-database-primary" class="svc-node" x="180" y="240" width="140" height="30" rx="6" fill="#374151"/>
+              <text class="svc-label" x="250" y="260">database-primary</text>
+              <rect id="node-dns-resolver" class="svc-node" x="340" y="240" width="120" height="30" rx="6" fill="#374151"/>
+              <text class="svc-label" x="400" y="260">dns-resolver</text>
+              <rect id="node-config-server" class="svc-node" x="480" y="240" width="120" height="30" rx="6" fill="#374151"/>
+              <text class="svc-label" x="540" y="260">config-server</text>
+              <rect id="node-log-server" class="svc-node" x="340" y="175" width="0" height="0" rx="6" fill="#374151"/>
+              <rect id="node-database-replica" class="svc-node" x="340" y="175" width="0" height="0" rx="6" fill="#374151"/>
+              <rect id="node-network-switch" class="svc-node" x="340" y="175" width="0" height="0" rx="6" fill="#374151"/>
+            </svg>
+          </div>
+        </div>
       </div>
-      <div class="card">
-        <div class="card-header"><span class="card-header-icon">&#9654;</span> Actions Taken</div>
-        <div id="actions-panel" class="card-body"><div class="empty">No actions yet</div></div>
+      <div class="card" style="flex:none">
+        <div class="card-header"><span class="card-header-icon">&#128200;</span> Health Timeline</div>
+        <div class="card-body" style="max-height:200px;min-height:180px;padding:8px 12px"><canvas id="health-chart"></canvas></div>
+      </div>
+    </div>
+    <!-- Post-Mortem tab -->
+    <div id="tab-postmortem" class="tab-content" style="flex-direction:column">
+      <div id="pm-content" class="pm-wrap">
+        <div class="empty" style="padding:80px 0">Complete an episode to view the post-mortem report.</div>
       </div>
     </div>
   </div>
@@ -426,15 +510,21 @@ let episodeActive = false;
 const ctx = $('health-chart').getContext('2d');
 window.healthChart = new Chart(ctx, {
   type: 'line',
-  data: { labels: [], datasets: [{ data: [], borderColor: '#34D399', borderWidth: 2,
-    pointRadius: 3, pointBackgroundColor: '#34D399', fill: true,
-    backgroundColor: 'rgba(52,211,153,.08)', tension: 0.3 }] },
-  options: { responsive: true, maintainAspectRatio: false, animation: false,
-    plugins: { legend: { display: false } },
+  data: { labels: [], datasets: [{ data: [], borderColor: '#34D399', borderWidth: 2.5,
+    pointRadius: 4, pointBackgroundColor: '#34D399', pointBorderColor: '#0B0B0F',
+    pointBorderWidth: 1.5, fill: true,
+    backgroundColor: 'rgba(52,211,153,.08)', tension: 0.35 }] },
+  options: { responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#16161D',
+      borderColor: 'rgba(255,255,255,.1)', borderWidth: 1, titleColor: '#E5E7EB',
+      bodyColor: '#A78BFA', bodyFont: { family: "'JetBrains Mono'" },
+      callbacks: { label: function(c) { return c.parsed.y.toFixed(0) + '%'; } } } },
     scales: { x: { display: true, grid: { color: 'rgba(255,255,255,.04)' },
-      ticks: { color: '#4B5563', font: { size: 9 } } },
-      y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,.04)' },
-      ticks: { color: '#4B5563', font: { size: 9 }, stepSize: 25 } } } }
+      ticks: { color: '#4B5563', font: { size: 9, family: "'JetBrains Mono'" } },
+      title: { display: true, text: 'Step', color: '#4B5563', font: { size: 9 } } },
+      y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,.05)' },
+      ticks: { color: '#4B5563', font: { size: 9, family: "'JetBrains Mono'" },
+        stepSize: 25, callback: function(v) { return v + '%'; } } } } }
 });
 
 function colorize(text) {
@@ -549,6 +639,7 @@ async function startEpisode() {
     $('step-display').textContent = data.step_count + '/' + data.max_steps;
     $('score-display').textContent = data.score.toFixed(2);
     updateAlerts(data.alerts);
+    updateServiceMap(data.alerts);
     updateActions();
     appendTerminal('', data.output);
   } catch (e) {
@@ -577,6 +668,7 @@ async function executeCmd() {
     $('step-display').textContent = data.step_count + '/' + data.max_steps;
     $('score-display').textContent = data.score.toFixed(2);
     updateAlerts(data.alerts);
+    updateServiceMap(data.alerts);
     updateActions();
     updateEvidence(data.evidence_notes);
     if (data.done) {
@@ -612,6 +704,56 @@ function showSummary(data) {
 
 function closeOverlay(e) {
   if (e.target === $('overlay')) $('overlay').classList.remove('visible');
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['dashboard','servicemap','postmortem'][i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  $('tab-' + name).classList.add('active');
+  if (name === 'postmortem') loadPostmortem();
+}
+
+function updateServiceMap(alerts) {
+  const svcColors = {};
+  if (alerts) alerts.forEach(a => {
+    const sev = a.severity;
+    if (!svcColors[a.service] || sev === 'critical') svcColors[a.service] = sev;
+  });
+  document.querySelectorAll('.svc-node').forEach(n => {
+    const svc = n.id.replace('node-','');
+    const sev = svcColors[svc];
+    if (sev === 'critical') n.setAttribute('fill','#7F1D1D');
+    else if (sev === 'warning') n.setAttribute('fill','#78350F');
+    else n.setAttribute('fill','#374151');
+  });
+}
+
+async function loadPostmortem() {
+  try {
+    const res = await fetch('/postmortem');
+    const d = await res.json();
+    if (d.error) { $('pm-content').innerHTML = '<div class="empty" style="padding:80px 0">' + d.error + '</div>'; return; }
+    let h = '<div class="pm-title">' + d.incident_title + '</div>';
+    h += '<div class="pm-section"><div class="pm-row"><div class="pm-label">Difficulty</div><div class="pm-val">' + d.difficulty + '</div></div>';
+    h += '<div class="pm-row"><div class="pm-label">Score</div><div class="pm-val" style="color:var(--accent)">' + d.final_score + '</div></div>';
+    h += '<div class="pm-row"><div class="pm-label">Root Cause Found</div><div class="pm-val">' + (d.root_cause_identified ? 'Yes' : 'No') + '</div></div>';
+    h += '<div class="pm-row"><div class="pm-label">Steps</div><div class="pm-val">' + d.total_steps + ' / ' + d.optimal_steps + ' optimal</div></div>';
+    h += '<div class="pm-row"><div class="pm-label">Efficiency</div><div class="pm-val">' + d.efficiency_rating + '</div></div>';
+    h += '<div class="pm-row"><div class="pm-label">Health</div><div class="pm-val">' + d.health_initial.toFixed(0) + '% &rarr; ' + d.health_final.toFixed(0) + '%</div></div></div>';
+    h += '<div class="pm-section"><h3>Timeline</h3>';
+    d.timeline.forEach(t => {
+      h += '<div class="pm-timeline-item"><div class="pm-step-num">#' + t.step + '</div><div class="pm-action">' + t.action + '</div><div class="pm-finding">' + t.finding + '</div></div>';
+    });
+    h += '</div>';
+    if (d.evidence_notes && d.evidence_notes.length) {
+      h += '<div class="pm-section"><h3>Evidence Notes</h3>';
+      d.evidence_notes.forEach(n => { h += '<div class="pm-timeline-item"><div class="pm-step-num">[' + n.step + ']</div><div class="pm-finding">' + n.text + '</div></div>'; });
+      h += '</div>';
+    }
+    $('pm-content').innerHTML = h;
+  } catch(e) { $('pm-content').innerHTML = '<div class="empty" style="padding:80px 0">Error loading post-mortem.</div>'; }
 }
 </script>
 </body>
