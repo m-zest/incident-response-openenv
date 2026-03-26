@@ -16,6 +16,7 @@ Usage:
     OPENAI_API_KEY=your-key python baseline.py
 """
 
+import argparse
 import os
 import json
 import sys
@@ -192,6 +193,12 @@ def run_episode(env: SREEnvironment, client: OpenAI, task_id: str, scenario_idx:
 
 
 def main():
+    parser = argparse.ArgumentParser(description="SRE Incident Response Baseline")
+    parser.add_argument("--task", type=str, default=None,
+                        choices=["easy", "medium", "hard", "expert"],
+                        help="Run only a specific difficulty tier (default: all)")
+    args = parser.parse_args()
+
     if not API_KEY:
         print("ERROR: Set OPENAI_API_KEY environment variable.")
         print("  For Groq (free):  export OPENAI_API_KEY=your-groq-key")
@@ -201,13 +208,16 @@ def main():
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
     env = SREEnvironment()
 
+    tiers = [args.task] if args.task else ["easy", "medium", "hard", "expert"]
+
     print(f"=== SRE Incident Response Baseline ===")
     print(f"Model: {MODEL}")
     print(f"API:   {BASE_URL}")
+    print(f"Tiers: {', '.join(tiers)}")
     print()
 
     all_results = {}
-    for task_id in ["easy", "medium", "hard", "expert"]:
+    for task_id in tiers:
         scenarios = env._scenarios[task_id]
         task_scores = []
 
