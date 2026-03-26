@@ -126,125 +126,212 @@ DASHBOARD_HTML = """\
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SRE Incident Response Simulator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0d1117;--bg-card:#161b22;--bg-input:#0d1117;
-  --border:#30363d;--border-focus:#58a6ff;
-  --text:#c9d1d9;--text-dim:#8b949e;--text-bright:#f0f6fc;
-  --accent:#58a6ff;--green:#3fb950;--yellow:#d29922;
-  --red:#f85149;--orange:#db6d28;--purple:#bc8cff;
+  --bg:#06090f;--bg-elevated:#0c1018;--bg-card:#111822;--bg-card-hover:#161e2a;
+  --bg-input:#0a0f18;--bg-surface:rgba(17,24,34,.65);
+  --border:rgba(56,68,90,.45);--border-subtle:rgba(56,68,90,.25);--border-focus:#3b82f6;
+  --text:#c9d1d9;--text-dim:#6b7b8d;--text-bright:#e6edf3;--text-muted:#4a5568;
+  --accent:#3b82f6;--accent-glow:rgba(59,130,246,.35);
+  --cyan:#22d3ee;--cyan-glow:rgba(34,211,238,.25);
+  --green:#34d399;--green-dim:rgba(52,211,153,.15);
+  --yellow:#fbbf24;--yellow-dim:rgba(251,191,36,.12);
+  --red:#ef4444;--red-dim:rgba(239,68,68,.12);--red-glow:rgba(239,68,68,.3);
+  --orange:#f97316;--purple:#a78bfa;--purple-glow:rgba(167,139,250,.2);
+  --glass:rgba(17,24,34,.55);--glass-border:rgba(255,255,255,.06);
   --mono:'JetBrains Mono',Consolas,'Courier New',monospace;
-  --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --radius:10px;--radius-lg:14px;--radius-sm:6px;
 }
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+::selection{background:var(--accent-glow);color:var(--text-bright)}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 var(--red-glow)}50%{box-shadow:0 0 8px 3px var(--red-glow)}}
+@keyframes glow-score{0%,100%{text-shadow:0 0 12px var(--cyan-glow)}50%{text-shadow:0 0 24px var(--cyan-glow),0 0 48px rgba(34,211,238,.1)}}
 
 /* ── Layout ── */
 .app{display:flex;flex-direction:column;height:100vh}
-.topbar{display:flex;align-items:center;gap:16px;padding:12px 20px;
-  background:var(--bg-card);border-bottom:1px solid var(--border);flex-shrink:0}
-.topbar-title{font-size:16px;font-weight:700;color:var(--text-bright);white-space:nowrap}
-.topbar-sub{font-size:11px;color:var(--text-dim);margin-top:1px}
-.topbar-left{display:flex;flex-direction:column;margin-right:auto}
-.topbar-stat{display:flex;flex-direction:column;align-items:center;min-width:90px}
-.topbar-stat-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-.topbar-stat-value{font-size:18px;font-weight:700;font-family:var(--mono)}
-.health-bar-wrap{width:180px}
-.health-bar-outer{height:8px;background:#21262d;border-radius:4px;overflow:hidden;margin-top:4px}
-.health-bar-inner{height:100%;border-radius:4px;transition:width .6s ease,background .6s ease}
-.health-green{background:var(--green)}.health-yellow{background:var(--yellow)}.health-red{background:var(--red)}
-.score-badge{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--accent)}
-.step-badge{font-family:var(--mono);font-size:15px;color:var(--text)}
+
+/* ── Top bar ── */
+.topbar{display:flex;align-items:center;gap:20px;padding:10px 24px;
+  background:var(--bg-elevated);border-bottom:1px solid var(--border-subtle);flex-shrink:0;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.topbar-left{display:flex;align-items:center;gap:14px;margin-right:auto}
+.topbar-logo{width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,#3b82f6,#8b5cf6);
+  display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;
+  color:#fff;flex-shrink:0;box-shadow:0 2px 8px rgba(59,130,246,.3)}
+.topbar-text{}
+.topbar-title{font-size:14px;font-weight:600;color:var(--text-bright);letter-spacing:-.2px}
+.topbar-sub{font-size:10px;color:var(--text-dim);margin-top:1px;letter-spacing:.3px}
+
+.topbar-metrics{display:flex;align-items:center;gap:24px}
+.metric{display:flex;flex-direction:column;align-items:center;gap:4px}
+.metric-label{font-size:9px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px}
+
+/* Radial health ring */
+.health-ring{position:relative;width:48px;height:48px}
+.health-ring svg{transform:rotate(-90deg)}
+.health-ring circle{fill:none;stroke-width:4;stroke-linecap:round}
+.health-ring .ring-bg{stroke:rgba(255,255,255,.06)}
+.health-ring .ring-fg{transition:stroke-dashoffset .8s ease,stroke .5s ease}
+.health-ring-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11px;font-weight:700}
+
+/* Score with glow */
+.score-val{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--cyan);
+  animation:glow-score 3s ease-in-out infinite}
+.step-val{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text)}
 
 /* ── Main area ── */
 .main{display:flex;flex:1;overflow:hidden}
-.panel-left{flex:0 0 62%;display:flex;flex-direction:column;border-right:1px solid var(--border)}
-.panel-right{flex:1;display:flex;flex-direction:column;overflow-y:auto}
+.panel-left{flex:0 0 62%;display:flex;flex-direction:column;
+  border-right:1px solid var(--border-subtle)}
+.panel-right{flex:1;display:flex;flex-direction:column;overflow-y:auto;
+  background:var(--bg);padding:8px}
+.panel-right::-webkit-scrollbar{width:5px}
+.panel-right::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
 
 /* ── Terminal ── */
-.terminal{flex:1;overflow-y:auto;padding:16px 20px;font-family:var(--mono);font-size:12.5px;
-  line-height:1.65;white-space:pre-wrap;word-break:break-word;background:var(--bg)}
-.terminal::-webkit-scrollbar{width:6px}
-.terminal::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
-.term-step{border-bottom:1px solid #21262d;padding-bottom:12px;margin-bottom:12px}
+.terminal-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;
+  margin:8px;margin-right:0;border-radius:var(--radius-lg);
+  background:var(--bg);border:1px solid var(--border-subtle);
+  box-shadow:inset 0 2px 12px rgba(0,0,0,.4)}
+.terminal-titlebar{display:flex;align-items:center;gap:6px;padding:10px 16px;
+  border-bottom:1px solid var(--border-subtle);flex-shrink:0}
+.terminal-dot{width:10px;height:10px;border-radius:50%}
+.dot-red{background:#ef4444}.dot-yellow{background:#fbbf24}.dot-green{background:#34d399}
+.terminal-titlebar-text{font-size:11px;color:var(--text-muted);margin-left:8px;font-family:var(--mono)}
+.terminal{flex:1;overflow-y:auto;padding:16px 20px;font-family:var(--mono);font-size:12px;
+  line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.terminal::-webkit-scrollbar{width:5px}
+.terminal::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06);border-radius:3px}
+.term-step{padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,.04);
+  animation:fadeIn .25s ease}
 .term-step:last-child{border-bottom:none}
-.term-cmd{color:var(--green);font-weight:600;margin-bottom:4px}
-.term-cmd::before{content:'$ ';color:var(--text-dim)}
-.term-time{color:var(--text-dim);font-size:11px}
+.term-cmd{color:var(--cyan);font-weight:600;margin-bottom:5px}
+.term-cmd::before{content:'> ';color:var(--text-muted)}
+.term-time{color:var(--text-muted);font-size:10px;margin-left:8px}
 .term-output{color:var(--text)}
-.term-error{color:var(--red)}.term-warn{color:var(--yellow)}.term-info{color:var(--accent)}
-.term-critical{color:var(--red);font-weight:700;background:rgba(248,81,73,.1);padding:1px 4px;border-radius:2px}
-.term-welcome{color:var(--text-dim);text-align:center;padding:60px 20px}
-.term-welcome h2{color:var(--text-bright);font-family:var(--sans);font-size:22px;margin-bottom:8px;font-weight:700}
-.term-welcome p{font-family:var(--sans);font-size:13px;line-height:1.6}
+.term-error{color:var(--red);font-weight:500}
+.term-warn{color:var(--yellow)}
+.term-info{color:var(--accent)}
+.term-critical{color:#ff6b6b;font-weight:700;background:var(--red-dim);
+  padding:1px 5px;border-radius:3px;border-left:2px solid var(--red)}
+.term-welcome{color:var(--text-dim);text-align:center;padding:80px 30px}
+.term-welcome h2{color:var(--text-bright);font-family:var(--sans);font-size:24px;
+  margin-bottom:10px;font-weight:700;letter-spacing:-.3px}
+.term-welcome p{font-family:var(--sans);font-size:13px;line-height:1.7;max-width:480px;margin:0 auto}
+.term-welcome .tiers{margin-top:16px;display:flex;justify-content:center;gap:16px;flex-wrap:wrap}
+.tier-tag{font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;
+  border:1px solid var(--border)}
+.tier-easy{color:var(--green);border-color:rgba(52,211,153,.3);background:var(--green-dim)}
+.tier-medium{color:var(--yellow);border-color:rgba(251,191,36,.3);background:var(--yellow-dim)}
+.tier-hard{color:var(--red);border-color:rgba(239,68,68,.3);background:var(--red-dim)}
+.tier-expert{color:var(--purple);border-color:rgba(167,139,250,.3);background:var(--purple-glow)}
 
-/* ── Right panel cards ── */
-.card{margin:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.card-header{padding:10px 14px;font-size:11px;font-weight:600;text-transform:uppercase;
-  letter-spacing:.6px;color:var(--text-dim);border-bottom:1px solid var(--border);background:#0d1117}
-.card-body{padding:10px 14px;max-height:200px;overflow-y:auto;font-size:12px}
-.card-body::-webkit-scrollbar{width:4px}
-.card-body::-webkit-scrollbar-thumb{background:#30363d;border-radius:2px}
+/* ── Cards ── */
+.card{background:var(--bg-card);border:1px solid var(--glass-border);border-radius:var(--radius);
+  overflow:hidden;margin-bottom:8px;backdrop-filter:blur(8px);
+  transition:border-color .2s}
+.card:hover{border-color:var(--border)}
+.card-header{padding:10px 14px;font-size:10px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.7px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);
+  display:flex;align-items:center;gap:6px}
+.card-header-icon{font-size:13px}
+.card-body{padding:10px 14px;max-height:180px;overflow-y:auto;font-size:12px}
+.card-body::-webkit-scrollbar{width:3px}
+.card-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06);border-radius:2px}
 
 /* Alerts */
-.alert-item{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #21262d}
+.alert-item{display:flex;align-items:flex-start;gap:8px;padding:7px 0;
+  border-bottom:1px solid rgba(255,255,255,.03);animation:fadeIn .2s ease}
 .alert-item:last-child{border-bottom:none}
-.sev-pill{font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;text-transform:uppercase;
-  white-space:nowrap;flex-shrink:0}
-.sev-critical{background:var(--red);color:#fff}
-.sev-warning{background:var(--orange);color:#fff}
-.sev-info{background:var(--accent);color:#fff}
-.alert-text{color:var(--text);font-size:11.5px;line-height:1.4}
-.alert-svc{color:var(--text-dim);font-size:10px}
+.sev-pill{font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;text-transform:uppercase;
+  white-space:nowrap;flex-shrink:0;letter-spacing:.3px}
+.sev-critical{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.25);
+  animation:pulse-red 2s infinite}
+.sev-warning{background:var(--yellow-dim);color:var(--yellow);border:1px solid rgba(251,191,36,.2)}
+.sev-info{background:rgba(59,130,246,.12);color:var(--accent);border:1px solid rgba(59,130,246,.2)}
+.alert-text{color:var(--text);font-size:11px;line-height:1.45}
+.alert-svc{color:var(--text-muted);font-size:10px;font-family:var(--mono);margin-top:1px}
 
-/* Actions taken */
-.action-item{padding:4px 0;font-family:var(--mono);font-size:11px;color:var(--text-dim);
-  border-bottom:1px solid #21262d}
+/* Command list */
+.cmd-list-item{padding:4px 8px;font-family:var(--mono);font-size:10.5px;color:var(--text-dim);
+  border-radius:var(--radius-sm);transition:background .15s;cursor:default;line-height:1.7}
+.cmd-list-item:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.cmd-list-item .cmd-name{color:var(--cyan);font-weight:500}
+.cmd-list-item .cmd-arg{color:var(--text-muted)}
+
+/* Actions & evidence */
+.action-item{padding:5px 0;font-family:var(--mono);font-size:11px;color:var(--text-dim);
+  border-bottom:1px solid rgba(255,255,255,.03);animation:fadeIn .2s ease}
 .action-item:last-child{border-bottom:none}
 .action-item .step-num{color:var(--accent);font-weight:600}
+.empty{color:var(--text-muted);font-style:normal;padding:16px 0;text-align:center;font-size:11px}
 
-/* No data */
-.empty{color:var(--text-dim);font-style:italic;padding:12px 0;text-align:center;font-size:11px}
-
-/* ── Bottom bar ── */
-.bottombar{display:flex;align-items:center;gap:10px;padding:10px 20px;
-  background:var(--bg-card);border-top:1px solid var(--border);flex-shrink:0}
+/* ── Bottom bar (Command Palette) ── */
+.bottombar{display:flex;align-items:center;gap:10px;padding:12px 24px;
+  background:var(--bg-elevated);border-top:1px solid var(--border-subtle);flex-shrink:0;
+  backdrop-filter:blur(12px)}
 .bottombar select,.bottombar input,.bottombar button{
-  font-family:var(--sans);font-size:13px;border-radius:6px;outline:none}
-.bottombar select{padding:7px 10px;background:var(--bg-input);color:var(--text);
-  border:1px solid var(--border);cursor:pointer}
-.bottombar select:focus{border-color:var(--border-focus)}
-.btn{padding:7px 16px;cursor:pointer;font-weight:600;border:none;border-radius:6px;transition:opacity .15s}
-.btn:hover{opacity:.85}
-.btn-primary{background:var(--accent);color:#0d1117}
-.btn-success{background:var(--green);color:#0d1117}
-.btn-danger{background:var(--red);color:#fff}
-.cmd-input{flex:1;padding:8px 12px;background:var(--bg-input);color:var(--text);
-  border:1px solid var(--border);font-family:var(--mono);font-size:13px}
-.cmd-input:focus{border-color:var(--border-focus)}
-.cmd-input::placeholder{color:var(--text-dim)}
-.cmd-input:disabled{opacity:.4}
+  font-family:var(--sans);font-size:13px;outline:none}
+
+.task-pill{padding:8px 14px;background:var(--bg-input);color:var(--text);
+  border:1px solid var(--border);border-radius:20px;cursor:pointer;font-weight:500;
+  -webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7b8d'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+.task-pill:focus{border-color:var(--border-focus)}
+
+.btn{padding:8px 18px;cursor:pointer;font-weight:600;border:none;border-radius:20px;
+  transition:all .2s ease;font-size:13px}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn-new{background:linear-gradient(135deg,#34d399,#059669);color:#fff;
+  box-shadow:0 2px 8px rgba(52,211,153,.25)}
+.btn-new:hover{box-shadow:0 4px 16px rgba(52,211,153,.35)}
+.btn-exec{background:linear-gradient(135deg,#3b82f6,#7c3aed);color:#fff;
+  box-shadow:0 2px 8px rgba(99,102,241,.25)}
+.btn-exec:hover{box-shadow:0 4px 16px rgba(99,102,241,.4)}
+.btn-exec:disabled,.btn-exec:disabled:hover{opacity:.3;cursor:not-allowed;
+  transform:none;box-shadow:none}
+
+.cmd-input{flex:1;padding:10px 16px;background:var(--bg-input);color:var(--text);
+  border:1px solid var(--border);border-radius:var(--radius);
+  font-family:var(--mono);font-size:13px;transition:border-color .2s,box-shadow .2s}
+.cmd-input:focus{border-color:var(--border-focus);
+  box-shadow:0 0 0 3px var(--accent-glow)}
+.cmd-input::placeholder{color:var(--text-muted)}
+.cmd-input:disabled{opacity:.3}
 
 /* ── Summary overlay ── */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;
-  justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .3s}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;z-index:100;
+  opacity:0;pointer-events:none;transition:opacity .3s}
 .overlay.visible{opacity:1;pointer-events:auto}
-.summary-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
-  padding:32px 40px;max-width:420px;width:90%;text-align:center}
-.summary-card h2{font-size:20px;color:var(--text-bright);margin-bottom:6px}
-.summary-card .score-big{font-size:52px;font-weight:700;font-family:var(--mono);margin:16px 0}
-.summary-card .detail{font-size:13px;color:var(--text-dim);line-height:1.8}
-.summary-card .detail span{color:var(--text)}
-.summary-card button{margin-top:20px}
+.summary-card{background:var(--bg-card);border:1px solid var(--glass-border);
+  border-radius:var(--radius-lg);padding:36px 44px;max-width:440px;width:92%;
+  text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.5);animation:fadeIn .3s ease}
+.summary-card h2{font-size:18px;color:var(--text-bright);margin-bottom:4px;font-weight:600}
+.summary-card .score-big{font-size:56px;font-weight:700;font-family:var(--mono);margin:20px 0;
+  letter-spacing:-2px}
+.summary-card .detail{font-size:12px;color:var(--text-dim);line-height:2}
+.summary-card .detail span{color:var(--text);font-weight:500}
+.summary-card .detail a{color:var(--accent);font-weight:500}
+.summary-card button{margin-top:24px}
 
 /* ── Responsive ── */
 @media(max-width:900px){
   .main{flex-direction:column}
-  .panel-left{flex:none;height:55%;border-right:none;border-bottom:1px solid var(--border)}
+  .panel-left{flex:none;height:55%;border-right:none;border-bottom:1px solid var(--border-subtle)}
   .panel-right{height:45%}
-  .health-bar-wrap{width:120px}
+  .topbar-metrics{gap:14px}
 }
 </style>
 </head>
@@ -253,67 +340,91 @@ a{color:var(--accent);text-decoration:none}
   <!-- Top bar -->
   <div class="topbar">
     <div class="topbar-left">
-      <div class="topbar-title">SRE Incident Response Simulator</div>
-      <div class="topbar-sub">OpenEnv DevSecOps Environment</div>
-    </div>
-    <div class="topbar-stat health-bar-wrap">
-      <div class="topbar-stat-label">System Health</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span id="health-val" class="topbar-stat-value" style="font-size:15px">--%</span>
-        <div class="health-bar-outer" style="flex:1">
-          <div id="health-bar" class="health-bar-inner health-green" style="width:0%"></div>
-        </div>
+      <div class="topbar-logo">SR</div>
+      <div class="topbar-text">
+        <div class="topbar-title">SRE Incident Response Simulator</div>
+        <div class="topbar-sub">OpenEnv DevSecOps Environment</div>
       </div>
     </div>
-    <div class="topbar-stat">
-      <div class="topbar-stat-label">Steps</div>
-      <div id="step-display" class="step-badge">0/0</div>
-    </div>
-    <div class="topbar-stat">
-      <div class="topbar-stat-label">Score</div>
-      <div id="score-display" class="score-badge">0.00</div>
+    <div class="topbar-metrics">
+      <div class="metric">
+        <div class="metric-label">Health</div>
+        <div class="health-ring">
+          <svg width="48" height="48" viewBox="0 0 48 48">
+            <circle class="ring-bg" cx="24" cy="24" r="20"/>
+            <circle id="health-ring-fg" class="ring-fg" cx="24" cy="24" r="20"
+              stroke="var(--green)" stroke-dasharray="125.66" stroke-dashoffset="125.66"/>
+          </svg>
+          <div id="health-val" class="health-ring-val" style="color:var(--text-muted)">--%</div>
+        </div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Steps</div>
+        <div id="step-display" class="step-val">0/0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Score</div>
+        <div id="score-display" class="score-val">0.00</div>
+      </div>
     </div>
   </div>
 
   <!-- Main panels -->
   <div class="main">
     <div class="panel-left">
-      <div id="terminal" class="terminal">
-        <div class="term-welcome">
-          <h2>Welcome, On-Call Engineer</h2>
-          <p>Select a difficulty tier and click <b>New Episode</b> to begin.<br>
-          Investigate the incident, identify the root cause, fix the system, then submit your diagnosis.<br><br>
-          <span style="color:var(--accent)">Easy</span> &middot; single alert &nbsp;|&nbsp;
-          <span style="color:var(--yellow)">Medium</span> &middot; correlated failures &nbsp;|&nbsp;
-          <span style="color:var(--red)">Hard</span> &middot; security ambiguity &nbsp;|&nbsp;
-          <span style="color:var(--purple)">Expert</span> &middot; forensic investigation</p>
+      <div class="terminal-wrap">
+        <div class="terminal-titlebar">
+          <div class="terminal-dot dot-red"></div>
+          <div class="terminal-dot dot-yellow"></div>
+          <div class="terminal-dot dot-green"></div>
+          <span class="terminal-titlebar-text">incident-response -- bash</span>
+        </div>
+        <div id="terminal" class="terminal">
+          <div class="term-welcome">
+            <h2>Welcome, On-Call Engineer</h2>
+            <p>Select a difficulty tier and click <b>New Episode</b> to begin.
+            Investigate the incident, identify the root cause, fix the system, then submit your diagnosis.</p>
+            <div class="tiers">
+              <span class="tier-tag tier-easy">Easy</span>
+              <span class="tier-tag tier-medium">Medium</span>
+              <span class="tier-tag tier-hard">Hard</span>
+              <span class="tier-tag tier-expert">Expert</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
     <div class="panel-right">
       <div class="card">
-        <div class="card-header">Active Alerts</div>
+        <div class="card-header"><span class="card-header-icon">&#9888;</span> Active Alerts</div>
         <div id="alerts-panel" class="card-body"><div class="empty">No active episode</div></div>
       </div>
       <div class="card">
-        <div class="card-header">Available Commands</div>
-        <div class="card-body" style="font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--text-dim)">
-          check_logs {service}<br>get_metrics {service}<br>list_alerts<br>
-          check_dependencies {service}<br>get_dependency_graph<br>
-          trace_failure {service}<br>restart_service {service}<br>
-          scale_up {service}<br>rollback_deploy {service}<br>
-          kill_process {service} pid={PID}<br>
-          check_process_list {service}<br>check_network {service}<br>
-          add_note {observation}<br>view_notes<br>
-          submit_root_cause {description}
+        <div class="card-header"><span class="card-header-icon">&#9881;</span> Commands</div>
+        <div class="card-body" style="max-height:none;padding:6px 8px">
+          <div class="cmd-list-item"><span class="cmd-name">check_logs</span> <span class="cmd-arg">{service}</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">get_metrics</span> <span class="cmd-arg">{service}</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">list_alerts</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">check_dependencies</span> <span class="cmd-arg">{service}</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">get_dependency_graph</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">trace_failure</span> <span class="cmd-arg">{service}</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">restart_service</span> <span class="cmd-arg">{service}</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">scale_up</span> <span class="cmd-arg">{service}</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">rollback_deploy</span> <span class="cmd-arg">{service}</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">kill_process</span> <span class="cmd-arg">{service} pid={PID}</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">check_process_list</span> <span class="cmd-arg">{service}</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">check_network</span> <span class="cmd-arg">{service}</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">add_note</span> <span class="cmd-arg">{observation}</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">view_notes</span></div>
+          <div class="cmd-list-item"><span class="cmd-name">submit_root_cause</span> <span class="cmd-arg">{description}</span></div>
         </div>
       </div>
       <div class="card">
-        <div class="card-header">Evidence Board</div>
-        <div id="evidence-panel" class="card-body"><div class="empty">No notes yet. Use add_note to record observations.</div></div>
+        <div class="card-header"><span class="card-header-icon">&#128270;</span> Evidence Board</div>
+        <div id="evidence-panel" class="card-body"><div class="empty">No notes yet</div></div>
       </div>
       <div class="card">
-        <div class="card-header">Actions Taken</div>
+        <div class="card-header"><span class="card-header-icon">&#9654;</span> Actions Taken</div>
         <div id="actions-panel" class="card-body"><div class="empty">No actions yet</div></div>
       </div>
     </div>
@@ -321,16 +432,16 @@ a{color:var(--accent);text-decoration:none}
 
   <!-- Bottom bar -->
   <div class="bottombar">
-    <select id="task-select">
+    <select id="task-select" class="task-pill">
       <option value="easy">Easy</option>
       <option value="medium">Medium</option>
       <option value="hard">Hard</option>
       <option value="expert">Expert</option>
     </select>
-    <button class="btn btn-success" onclick="startEpisode()">New Episode</button>
+    <button class="btn btn-new" onclick="startEpisode()">New Episode</button>
     <input id="cmd-input" class="cmd-input" placeholder="Type command... e.g., check_logs payment-service"
            disabled onkeydown="if(event.key==='Enter')executeCmd()">
-    <button id="exec-btn" class="btn btn-primary" onclick="executeCmd()" disabled>Execute</button>
+    <button id="exec-btn" class="btn btn-exec" onclick="executeCmd()" disabled>Execute</button>
   </div>
 </div>
 
@@ -340,7 +451,7 @@ a{color:var(--accent);text-decoration:none}
     <h2 id="sum-title">Episode Complete</h2>
     <div id="sum-score" class="score-big" style="color:var(--green)">0.00</div>
     <div id="sum-details" class="detail"></div>
-    <button class="btn btn-primary" onclick="document.getElementById('overlay').classList.remove('visible')">Continue</button>
+    <button class="btn btn-exec" onclick="document.getElementById('overlay').classList.remove('visible')">Continue</button>
   </div>
 </div>
 
@@ -358,9 +469,10 @@ function colorize(text) {
 }
 
 function updateHealth(h) {
-  const bar = $('health-bar');
-  bar.style.width = h + '%';
-  bar.className = 'health-bar-inner ' + (h > 70 ? 'health-green' : h > 40 ? 'health-yellow' : 'health-red');
+  const ring = $('health-ring-fg');
+  const circum = 125.66;
+  ring.style.strokeDashoffset = circum - (circum * h / 100);
+  ring.style.stroke = h > 70 ? 'var(--green)' : h > 40 ? 'var(--yellow)' : 'var(--red)';
   $('health-val').textContent = h.toFixed(0) + '%';
   $('health-val').style.color = h > 70 ? 'var(--green)' : h > 40 ? 'var(--yellow)' : 'var(--red)';
 }
