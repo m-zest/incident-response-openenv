@@ -155,6 +155,8 @@
     "root_cause": "supply_chain_attack_compromised_dependency",
     "root_cause_service": "api-gateway",
     "root_cause_keywords": ["supply chain", "dependency", "package", "npm", "backdoor", "exfiltration", "compromised", "attack", "security"],
+    "lockdown_after_step": 10,
+    "lockdown_revoke": ["restart_service", "scale_up"],
     "fix_action": "submit_root_cause",
     "fix_target": "api-gateway",
     "special_fix": "rollback_dependency",
