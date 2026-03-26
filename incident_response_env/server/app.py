@@ -79,6 +79,21 @@ async def get_postmortem():
     return env.get_postmortem()
 
 
+@app.get("/mcp/tools")
+async def mcp_tools():
+    """MCP-compatible tool discovery. Returns available commands as JSON schemas.
+    Tools may be revoked mid-episode during security lockdown scenarios."""
+    if env._cluster is None:
+        return {"tools": [], "note": "No active episode. Call reset first."}
+    tools = env._cluster.get_available_tools()
+    revoked = list(env._cluster._revoked_tools)
+    return {
+        "tools": tools,
+        "revoked": revoked,
+        "lockdown_active": len(revoked) > 0,
+    }
+
+
 # ── Web UI API Endpoints ──────────────────────────────────────────────────
 
 

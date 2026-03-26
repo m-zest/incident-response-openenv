@@ -145,6 +145,11 @@ class SimulatedCluster:
         self.evidence_board: list[dict] = []
         self._current_step = 0
 
+        # MCP tool revocation (security lockdown scenarios)
+        self._revoked_tools: set = set()
+        self._lockdown_after_step = scenario.get("lockdown_after_step", None)
+        self._lockdown_revoke = scenario.get("lockdown_revoke", [])
+
         # Build dependency graph with NetworkX
         self._dep_graph = nx.DiGraph()
         for svc in self.services:
@@ -157,8 +162,53 @@ class SimulatedCluster:
         """Return currently firing alerts."""
         return [a for a in self.alerts]
 
+    def get_available_tools(self) -> list[dict]:
+        """Return MCP-compatible tool schemas for currently available commands."""
+        all_tools = [
+            {"name": "check_logs", "description": "View recent log entries for a service",
+             "parameters": {"type": "object", "properties": {"service": {"type": "string"}}, "required": ["service"]}},
+            {"name": "get_metrics", "description": "View CPU, memory, disk, latency, connections",
+             "parameters": {"type": "object", "properties": {"service": {"type": "string"}}, "required": ["service"]}},
+            {"name": "list_alerts", "description": "View all firing alerts",
+             "parameters": {"type": "object", "properties": {}}},
+            {"name": "check_dependencies", "description": "See upstream/downstream dependencies",
+             "parameters": {"type": "object", "properties": {"service": {"type": "string"}}, "required": ["service"]}},
+            {"name": "get_dependency_graph", "description": "Full dependency tree with health status",
+             "parameters": {"type": "object", "properties": {}}},
+            {"name": "trace_failure", "description": "Trace blast radius and unhealthy upstream paths",
+             "parameters": {"type": "object", "properties": {"service": {"type": "string"}}, "required": ["service"]}},
+            {"name": "restart_service", "description": "Restart a service process",
+             "parameters": {"type": "object", "properties": {"service": {"type": "string"}}, "required": ["service"]}},
+            {"name": "scale_up", "description": "Add service replicas",
+             "parameters": {"type": "object", "properties": {"service": {"type": "string"}}, "required": ["service"]}},
+            {"name": "rollback_deploy", "description": "Roll back to previous version",
+             "parameters": {"type": "object", "properties": {"service": {"type": "string"}}, "required": ["service"]}},
+            {"name": "kill_process", "description": "Kill a process by PID (requires prior check_network)",
+             "parameters": {"type": "object", "properties": {"service": {"type": "string"}, "pid": {"type": "string"}}, "required": ["service", "pid"]}},
+            {"name": "check_process_list", "description": "View running processes",
+             "parameters": {"type": "object", "properties": {"service": {"type": "string"}}, "required": ["service"]}},
+            {"name": "check_network", "description": "View network connections",
+             "parameters": {"type": "object", "properties": {"service": {"type": "string"}}, "required": ["service"]}},
+            {"name": "add_note", "description": "Save an observation to the evidence board",
+             "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}},
+            {"name": "view_notes", "description": "Review saved observations",
+             "parameters": {"type": "object", "properties": {}}},
+            {"name": "get_runbook", "description": "Get standard operating procedure for this incident",
+             "parameters": {"type": "object", "properties": {}}},
+            {"name": "submit_root_cause", "description": "Declare root cause diagnosis (ends episode)",
+             "parameters": {"type": "object", "properties": {"description": {"type": "string"}}, "required": ["description"]}},
+        ]
+        return [t for t in all_tools if t["name"] not in self._revoked_tools]
+
     def execute_command(self, command: str, target: str, parameters: dict) -> str:
         """Process an agent command and return text output."""
+
+        # Check for revoked tools (security lockdown)
+        if command in self._revoked_tools:
+            return (
+                f"ERROR: {command} is disabled during security lockdown. "
+                f"Use alternative remediation (rollback_deploy or kill_process)."
+            )
 
         if command == "check_logs":
             return self._check_logs(target, parameters)
@@ -564,6 +614,13 @@ class SimulatedCluster:
         """Called each step. Handles malware respawn AND progressive degradation."""
         self._current_step += 1
         self._log_gen.advance()
+
+        # Security lockdown: revoke tools after threshold step
+        if (self._lockdown_after_step
+                and self._current_step >= self._lockdown_after_step
+                and not self._revoked_tools):
+            for tool in self._lockdown_revoke:
+                self._revoked_tools.add(tool)
 
         # Complete pending restarts
         for svc, info in list(self._restarting.items()):

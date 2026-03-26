@@ -98,6 +98,10 @@ psi          = 0.15 per destructive action
 
 **Post-Mortem:** After each episode, `GET /postmortem` returns a structured incident report with timeline, efficiency rating, and evidence notes.
 
+**MCP Tool Discovery:** `GET /mcp/tools` returns available commands as JSON schemas. During expert security scenarios, tools are dynamically revoked mid-episode (security lockdown) — the agent must adapt when `restart_service` and `scale_up` become unavailable.
+
+**RL Training Ready:** Includes `examples/train_with_trl.py` showing how to connect to HuggingFace TRL's GRPOTrainer. The deterministic grader provides the reward signal.
+
 ## API
 
 | Endpoint | Method | Description |
@@ -110,6 +114,7 @@ psi          = 0.15 per destructive action
 | `/grader` | GET | Grading result after episode completion |
 | `/baseline` | GET | Pre-computed baseline scores |
 | `/postmortem` | GET | Structured post-mortem incident report |
+| `/mcp/tools` | GET | MCP-compatible tool discovery (dynamic, reflects lockdown state) |
 
 ## Docker
 
