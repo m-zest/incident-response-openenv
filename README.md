@@ -1,6 +1,6 @@
 # Incident Response SRE Environment
 
-An OpenEnv-compatible reinforcement learning environment that simulates production infrastructure incidents. An AI agent acts as an on-call SRE engineer — triaging alerts, diagnosing root causes, and executing remediations across a simulated microservices cluster.
+An OpenEnv-compatible RL environment where an AI agent acts as an on-call SRE engineer diagnosing production infrastructure failures. 14 scenarios across 4 difficulty tiers test investigation, multi-step reasoning, security analysis, and calibrated restraint.
 
 [![OpenEnv](https://img.shields.io/badge/OpenEnv-Compatible-blue)](https://github.com/meta-pytorch/OpenEnv)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-green)](https://python.org)
@@ -8,130 +8,124 @@ An OpenEnv-compatible reinforcement learning environment that simulates producti
 
 Built for the [OpenEnv AI Hackathon](https://pytorch.org/event/openenv-ai-hackathon/) (Meta x Hugging Face x PyTorch).
 
-## Overview
+## Baseline: Human vs AI
 
-Every production system fails. When it does, a human engineer must rapidly triage alerts, investigate logs, trace dependency chains, and execute the correct fix — often under pressure with incomplete information.
+| Tier | AI (Nemotron 3 Super 120B) | Human SRE | Gap | Scenarios |
+|------|---------------------------|-----------|-----|-----------|
+| Easy | 0.77 | 0.90 | 0.13 | 5 |
+| Medium | 0.46 | 0.80 | 0.34 | 4 |
+| Hard | 0.26 | 0.70 | 0.44 | 3 |
+| Expert | 0.00 | 0.74 | 0.74 | 2 |
 
-This environment captures that challenge as a standardized RL benchmark with:
+All 14 scenarios are fully solvable. A human SRE engineer completes expert-tier split-brain scenarios in 9 steps with score 0.74. Nemotron 3 Super (120B parameters) scores 0.00 on the same scenarios, demonstrating significant room for RL fine-tuning.
 
-- **14 scenarios** across 4 difficulty tiers (easy, medium, hard, expert)
-- **17 agent commands** including investigation, remediation, forensics, and diagnosis
-- **Deterministic scoring** — same actions always produce same scores, no LLM-as-judge
-- **Dense reward signals** — partial credit per step enables effective RL training
-- **Cross-domain reasoning** — hard/expert tasks blend SRE with cybersecurity
-- **Dynamic state** — systems actively degrade over time, alerts escalate, noise alerts auto-resolve
-- **Interactive web dashboard** with real-time health timeline, service dependency map, and post-mortem reports
+**Why the gap exists:**
+- **Easy:** Single alert, obvious fix. AI handles it.
+- **Medium:** Multi-service correlation required. AI struggles to trace dependency chains.
+- **Hard:** Security ambiguity. AI cannot distinguish crypto-mining attacks from memory leaks, or DDoS from traffic spikes.
+- **Expert:** Forensic investigation across partitioned systems. AI gets stuck in investigation loops without converging.
 
-## Quick Start
+## Scoring Formula
 
-```bash
-git clone https://github.com/m-zest/incident-response-openenv.git
-cd incident-response-openenv
-pip install -e ".[dev]"
-cp .env.example .env
-uvicorn incident_response_env.server.app:app --host 0.0.0.0 --port 8000
+```
+S = max(0, (H_final - H_initial) / (100 - H_initial) * omega - phi - psi)
 ```
 
-Open `http://localhost:8000/web` for the interactive dashboard.
+| Variable | Value |
+|----------|-------|
+| omega | 1.0 correct diagnosis, 0.8 fixed + timed out, 0.6 fixed + wrong diagnosis, 0.3 neither |
+| phi | 0.02 per step beyond optimal (max 0.3) |
+| psi | 0.15 per destructive action |
 
-## Action Space
+Step rewards: +0.08 investigating root cause service, +0.25 correct fix, +0.30 correct diagnosis, -0.05 restarting healthy service, -0.10 wrong diagnosis.
+
+## Action Space (17 commands)
 
 | Command | Description |
 |---------|-------------|
-| `check_logs {service}` | View recent log entries |
-| `get_metrics {service}` | View CPU, memory, disk, latency, connections |
-| `list_alerts` | View all firing alerts (includes noise alerts that auto-resolve) |
-| `check_dependencies {service}` | See upstream/downstream dependencies |
-| `get_dependency_graph` | Full dependency tree with health status and impact analysis |
+| `check_logs {service}` | View recent log entries for a service |
+| `get_metrics {service}` | View CPU, memory, disk, latency, connection stats |
+| `list_alerts` | View all firing alerts (includes auto-resolving noise alerts) |
+| `check_dependencies {service}` | See upstream/downstream service dependencies |
+| `get_dependency_graph` | Full dependency tree with health status and impact ranking |
 | `trace_failure {service}` | Trace upstream deps, downstream blast radius, unhealthy paths |
 | `restart_service {service}` | Restart a service (heavy services take 2 steps) |
 | `scale_up {service}` | Add service replicas |
 | `rollback_deploy {service}` | Roll back to previous version |
-| `kill_process {service}` | Kill a process by PID (requires prior `check_network` for security scenarios) |
-| `check_process_list {service}` | View running processes (detects malware) |
-| `check_network {service}` | View network connections (detects exfiltration) |
+| `kill_process {service}` | Kill a process by PID (requires prior `check_process_list`) |
+| `check_process_list {service}` | View running processes (detects disguised malware) |
+| `check_network {service}` | View network connections (detects C2 exfiltration) |
 | `add_note {text}` | Save an observation to the evidence board |
 | `view_notes` | Review saved observations with step numbers |
 | `get_runbook` | Get the standard operating procedure for this incident type |
-| `get_dependency_graph` | NetworkX-powered dependency analysis |
+| `get_dependency_graph` | NetworkX-powered graph with PageRank impact analysis |
 | `submit_root_cause {description}` | Declare diagnosis (ends episode) |
 
-## Difficulty Tiers
+## Scenarios (14 total)
 
-| Tier | Scenarios | Expected Score | Description |
-|------|-----------|---------------|-------------|
-| **Easy** | 5 | ~0.85 | Single alert, isolated failure. Diagnose and fix in 2-3 steps. |
-| **Medium** | 4 | ~0.50 | Correlated multi-service failures. Trace dependency chains 2-3 layers deep. |
-| **Hard** | 3 | ~0.20 | Cascading failures with security ambiguity. Distinguish SRE issues from active breaches. |
-| **Expert** | 2 | ~0.08 | Forensic investigation. Split-brain databases, supply chain attacks. |
+**Easy (5 scenarios, 10 steps max):**
+Disk full on log server, worker queue process crash, failed API gateway deployment, memory leak in user service, expired TLS certificate on payment service.
 
-## Scoring
+**Medium (4 scenarios, 15 steps max):**
+Database connection pool exhaustion, Redis cache eviction storm, message queue backlog causing worker starvation, internal DNS resolution failure.
 
-Fully deterministic formula:
+**Hard (3 scenarios, 20 steps max):**
+Crypto-mining attack disguised as memory leak (malware hidden as `[jvm-gc-thread-4]` among 10 processes), cascading TLS failure from corrupted config push (config-server looks healthy, no alerts point to it), DDoS attack vs legitimate traffic spike (must analyze multiple log entries to distinguish).
 
-```
-S = max(0, health_ratio * omega - phi - psi)
-
-health_ratio = (H_final - H_initial) / (100 - H_initial)
-omega        = 1.0 (correct diagnosis) | 0.8 (fixed, timed out) | 0.6 (fixed, no diagnosis) | 0.3 (neither)
-phi          = 0.02 per step beyond optimal (max 0.3)
-psi          = 0.15 per destructive action
-```
-
-**Step rewards:** +0.08 investigating root cause service, +0.25 correct fix, +0.30 correct diagnosis, -0.05 restarting healthy service, -0.10 wrong diagnosis.
+**Expert (2 scenarios, 25 steps max):**
+Database split-brain during network partition (both nodes claim primary, writes diverging, must compare WAL positions), supply chain attack via compromised npm dependency (backdoor exfiltrating env vars across 3 services, security lockdown revokes tools mid-episode).
 
 ## Key Features
 
-**Dynamic State:** Systems degrade over time. CPU and latency worsen each step. After step 4, failures cascade to dependent services. After step 5, warnings escalate to critical.
+- **Dynamic state** -- systems degrade each step (CPU +0.5/step, latency x1.08, health -1.5/step), cascading to dependents after step 4, warnings escalate to critical at step 5
+- **Red herring alerts** -- noise alerts (backups, GC, auto-scaling) appear alongside real alerts and auto-resolve after 2-3 steps
+- **Action latency** -- heavy services (database, Redis) take 2 steps to restart; agent can investigate while waiting
+- **Runbooks** -- per-scenario standard operating procedures via `get_runbook`
+- **Evidence board** -- `add_note` / `view_notes` for tracking hypotheses across steps
+- **Dependency graph** -- NetworkX-powered `trace_failure` with blast radius and unhealthy path detection
+- **Kill process prerequisites** -- security scenarios require `check_process_list` before `kill_process`
+- **MCP tool discovery** -- `GET /mcp/tools` returns JSON schemas; expert scenarios dynamically revoke tools mid-episode (security lockdown)
+- **Post-mortem reports** -- `GET /postmortem` returns structured incident timeline with efficiency rating
+- **Seed reproducibility** -- `reset(seed=42)` produces identical episodes
+- **RL training ready** -- `examples/train_with_trl.py` shows HuggingFace TRL GRPOTrainer integration
 
-**Noise Alerts:** Red herring alerts (scheduled backups, GC runs, auto-scaling checks) appear alongside real alerts and auto-resolve after 2-3 steps. Agents must distinguish signal from noise.
-
-**Action Latency:** Heavy services (database, Redis) take 2 steps to restart. Agents can investigate other services while waiting.
-
-**Runbooks:** Each scenario provides a standard operating procedure via `get_runbook`. Guides optimal investigation order.
-
-**Evidence Board:** `add_note` / `view_notes` lets agents track observations and hypotheses across investigation steps.
-
-**Dependency Graph:** NetworkX-powered graph analysis. `trace_failure` reveals upstream/downstream blast radius and identifies unhealthy paths.
-
-**Kill Process:** Security scenarios require `check_network` before `kill_process` works — agents must confirm the threat before acting.
-
-**Post-Mortem:** After each episode, `GET /postmortem` returns a structured incident report with timeline, efficiency rating, and evidence notes.
-
-**MCP Tool Discovery:** `GET /mcp/tools` returns available commands as JSON schemas. During expert security scenarios, tools are dynamically revoked mid-episode (security lockdown) — the agent must adapt when `restart_service` and `scale_up` become unavailable.
-
-**RL Training Ready:** Includes `examples/train_with_trl.py` showing how to connect to HuggingFace TRL's GRPOTrainer. The deterministic grader provides the reward signal.
-
-## API
+## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/` | GET | Redirect to web dashboard |
-| `/web` | GET | Interactive SRE dashboard |
-| `/ws` | WebSocket | Standard OpenEnv interaction |
+| `/web` | GET | Interactive dashboard |
 | `/health` | GET | Health check |
-| `/tasks` | GET | Available tasks with action/observation schemas |
-| `/grader` | GET | Grading result after episode completion |
-| `/baseline` | GET | Pre-computed baseline scores |
-| `/postmortem` | GET | Structured post-mortem incident report |
-| `/mcp/tools` | GET | MCP-compatible tool discovery (dynamic, reflects lockdown state) |
+| `/tasks` | GET | List tasks with action/observation schemas |
+| `/baseline` | GET | AI and human baseline scores |
+| `/grader` | GET | Grading result after episode |
+| `/postmortem` | GET | Structured incident report after episode |
+| `/mcp/tools` | GET | MCP tool discovery (reflects lockdown state) |
+| `/ws` | WebSocket | Standard OpenEnv agent connection |
+| `/web/reset` | POST | Start new episode |
+| `/web/step` | POST | Execute command |
 
-## Docker
+## Running Locally
 
 ```bash
+# From source
+git clone https://github.com/m-zest/incident-response-openenv.git
+cd incident-response-openenv
+pip install -e ".[dev]"
+uvicorn incident_response_env.server.app:app --host 0.0.0.0 --port 8000
+
+# Docker
 docker build -t incident-response-env:latest .
 docker run -p 8000:8000 incident-response-env:latest
-```
 
-## Baseline
-
-```bash
-export OPENAI_API_KEY=your-groq-key
+# Baseline (supports Groq, NVIDIA, OpenAI)
+export OPENAI_API_KEY=your-key
 export OPENAI_BASE_URL=https://api.groq.com/openai/v1
-python baseline.py
+python baseline.py --task hard  # or: easy, medium, expert, or omit for all
 ```
 
-Supports Groq, NVIDIA Nemotron, and OpenAI. Includes automatic retry with exponential backoff on rate limits.
+## Architecture
+
+`models.py` defines Pydantic types (Action, Observation, State). Scenario JSON files contain pre-built incidents with fake logs, metrics, processes, and network connections. `infrastructure.py` loads scenarios, manages the simulated cluster, processes commands, and handles time-evolving state via NetworkX dependency graphs. `grader.py` computes deterministic scores. `environment.py` orchestrates everything as an OpenEnv Environment (reset/step/state). `app.py` wraps it in FastAPI with WebSocket, REST endpoints, and the interactive web dashboard.
 
 ## Tests
 
@@ -139,35 +133,19 @@ Supports Groq, NVIDIA Nemotron, and OpenAI. Includes automatic retry with expone
 pytest tests/ -v
 ```
 
-25 tests covering grader determinism, environment lifecycle, scenario loading, and seeded reproducibility.
+25 tests covering grader determinism, environment lifecycle, scenario loading, seeded reproducibility, and all 4 difficulty tiers.
 
 ## Project Structure
 
 ```
 incident-response-openenv/
 ├── incident_response_env/
-│   ├── __init__.py
-│   ├── models.py                  # Pydantic Action, Observation, State
-│   ├── client.py                  # OpenEnv client
-│   ├── scenarios/
-│   │   ├── easy.json              # 5 scenarios
-│   │   ├── medium.json            # 4 scenarios
-│   │   ├── hard.json              # 3 scenarios
-│   │   └── expert.json            # 2 scenarios
-│   └── server/
-│       ├── app.py                 # FastAPI + web dashboard
-│       ├── environment.py         # OpenEnv Environment class
-│       ├── infrastructure.py      # Simulated cluster engine
-│       └── grader.py              # Deterministic scoring
-├── tests/
-│   └── test_environment.py
-├── baseline.py
-├── Dockerfile
-├── requirements.txt
-├── pyproject.toml
-├── openenv.yaml
-├── .env.example
-└── LICENSE
+│   ├── models.py, client.py, __init__.py
+│   ├── scenarios/ (easy.json, medium.json, hard.json, expert.json)
+│   └── server/ (app.py, environment.py, infrastructure.py, grader.py)
+├── tests/test_environment.py
+├── examples/train_with_trl.py
+├── baseline.py, Dockerfile, requirements.txt, pyproject.toml, openenv.yaml
 ```
 
 ## Author
