@@ -139,6 +139,7 @@ class SimulatedCluster:
         self.destructive_actions = 0
         self.steps_since_restart = 0
         self._network_checked: set = set()
+        self._restarting: dict = {}  # service -> steps remaining
 
         # Evidence board for agent notes
         self.evidence_board: list[dict] = []
@@ -278,7 +279,21 @@ class SimulatedCluster:
 
         self.restarted_services.append(service)
 
+        # Check for restart delay on heavy services
+        svc_def = self.scenario["services"].get(service, {})
+        delay = svc_def.get("restart_delay", 0)
+
         if service == self.fix_target and self.fix_action == "restart_service":
+            if delay > 0 and service not in self._restarting:
+                self._restarting[service] = {"steps_left": delay, "is_fix": True}
+                self.services[service]["status"] = "restarting"
+                self.services[service]["logs"].append(
+                    f"[RESTART] Service {service} restarting... ({delay} steps to complete)")
+                return (
+                    f"Service '{service}' restart initiated.\n"
+                    f"This is a heavy service — restart takes {delay} steps to complete.\n"
+                    f"System health: {self.health:.0f}% (unchanged until restart completes)"
+                )
             self.services[service]["healthy"] = True
             self.services[service]["status"] = "healthy"
             old_health = self.health
@@ -549,6 +564,20 @@ class SimulatedCluster:
         """Called each step. Handles malware respawn AND progressive degradation."""
         self._current_step += 1
         self._log_gen.advance()
+
+        # Complete pending restarts
+        for svc, info in list(self._restarting.items()):
+            info["steps_left"] -= 1
+            if info["steps_left"] <= 0:
+                self.services[svc]["healthy"] = True
+                self.services[svc]["status"] = "healthy"
+                self.services[svc]["logs"].append(f"[RESTART] Service {svc} restart completed.")
+                if info.get("is_fix"):
+                    old_health = self.health
+                    self.health = self.health_on_fix
+                    self.resolved = True
+                    self.alerts = [a for a in self.alerts if a["service"] != svc]
+                del self._restarting[svc]
 
         # Auto-resolve noise alerts
         for na in self._noise_alerts:

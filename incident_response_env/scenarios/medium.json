@@ -78,6 +78,7 @@
       "database-primary": {
         "status": "degraded",
         "healthy": false,
+        "restart_delay": 2,
         "logs": [
           "[2026-03-25T10:14:30Z] WARN   Max connections reached: 200/200",
           "[2026-03-25T10:14:32Z] WARN   Slow query detected: SELECT * FROM users JOIN orders ON... (12.4s)",
@@ -143,6 +144,7 @@
       "cache-redis": {
         "status": "degraded",
         "healthy": false,
+        "restart_delay": 2,
         "logs": [
           "[2026-03-25T11:00:00Z] WARN   Memory limit reached: 2048MB/2048MB",
           "[2026-03-25T11:00:01Z] WARN   Eviction policy 'allkeys-lru' active: evicting 1200 keys/sec",
