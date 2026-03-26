@@ -37,8 +37,8 @@ def compute_step_reward(
     elif command == "list_alerts":
         reward += 0.02
 
-    # Evidence board (neutral — tracking, not acting)
-    elif command in ("add_note", "view_notes"):
+    # Evidence board and runbook (neutral — tracking, not acting)
+    elif command in ("add_note", "view_notes", "get_runbook"):
         reward += 0.0
 
     # Restarting services

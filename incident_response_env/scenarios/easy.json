@@ -64,7 +64,19 @@
       "payment-service": ["database-primary"],
       "log-server": []
     },
-    "health_on_fix": 95
+    "health_on_fix": 95,
+    "noise_alerts": [
+      {"service": "worker-queue", "severity": "info", "message": "Scheduled backup running, temporary I/O spike", "auto_resolve_after": 2},
+      {"service": "frontend", "severity": "info", "message": "Auto-scaling check completed, no action needed", "auto_resolve_after": 3}
+    ],
+    "runbook": [
+      "1. Check disk usage: get_metrics log-server",
+      "2. Review log volume: check_logs log-server",
+      "3. Check log rotation: check_process_list log-server",
+      "4. If disk > 90%: restart_service log-server",
+      "5. Verify recovery: get_metrics log-server",
+      "6. Submit diagnosis: submit_root_cause disk full on log-server"
+    ]
   },
   {
     "id": "easy_service_crash",
@@ -117,7 +129,17 @@
       "worker-queue": ["database-primary"],
       "api-gateway": ["worker-queue", "user-service"]
     },
-    "health_on_fix": 92
+    "health_on_fix": 92,
+    "noise_alerts": [
+      {"service": "cache-redis", "severity": "info", "message": "Memory defragmentation in progress", "auto_resolve_after": 2}
+    ],
+    "runbook": [
+      "1. Check worker status: check_logs worker-queue",
+      "2. Review process state: check_process_list worker-queue",
+      "3. Restart crashed worker: restart_service worker-queue",
+      "4. Verify queue processing: get_metrics worker-queue",
+      "5. Submit diagnosis: submit_root_cause worker process crash"
+    ]
   },
   {
     "id": "easy_bad_deploy",
@@ -178,7 +200,18 @@
       "frontend": ["api-gateway"],
       "api-gateway": ["user-service", "payment-service", "database-primary"]
     },
-    "health_on_fix": 93
+    "health_on_fix": 93,
+    "noise_alerts": [
+      {"service": "database-primary", "severity": "info", "message": "Routine vacuum operation running", "auto_resolve_after": 2},
+      {"service": "cache-redis", "severity": "info", "message": "Key eviction rate normal, no action required", "auto_resolve_after": 3}
+    ],
+    "runbook": [
+      "1. Check error rates: check_logs api-gateway",
+      "2. Identify deployment: check_logs api-gateway (look for version info)",
+      "3. Roll back: rollback_deploy api-gateway",
+      "4. Verify recovery: get_metrics api-gateway",
+      "5. Submit diagnosis: submit_root_cause bad deployment on api-gateway"
+    ]
   },
   {
     "id": "easy_memory_leak",
@@ -224,7 +257,18 @@
       "user-service": ["cache-redis", "database-primary"],
       "api-gateway": ["user-service"]
     },
-    "health_on_fix": 94
+    "health_on_fix": 94,
+    "noise_alerts": [
+      {"service": "log-server", "severity": "info", "message": "Log rotation completed successfully", "auto_resolve_after": 2}
+    ],
+    "runbook": [
+      "1. Check memory trend: get_metrics user-service",
+      "2. Review memory logs: check_logs user-service",
+      "3. Check for leak pattern: check_process_list user-service",
+      "4. Restart to reclaim memory: restart_service user-service",
+      "5. Verify memory stable: get_metrics user-service",
+      "6. Submit diagnosis: submit_root_cause memory leak in user-service"
+    ]
   },
   {
     "id": "easy_cert_expired",
@@ -267,6 +311,16 @@
       "payment-service": ["database-primary"],
       "api-gateway": ["payment-service"]
     },
-    "health_on_fix": 96
+    "health_on_fix": 96,
+    "noise_alerts": [
+      {"service": "config-server", "severity": "info", "message": "Configuration sync check passed", "auto_resolve_after": 3}
+    ],
+    "runbook": [
+      "1. Check TLS status: check_logs payment-service",
+      "2. Verify certificate: get_metrics payment-service",
+      "3. Restart to reload certs: restart_service payment-service",
+      "4. Verify HTTPS restored: get_metrics payment-service",
+      "5. Submit diagnosis: submit_root_cause expired TLS certificate on payment-service"
+    ]
   }
 ]

@@ -22,7 +22,7 @@ class SREAction(BaseModel):
             "restart_service, scale_up, rollback_deploy, kill_process, "
             "check_process_list, check_network, "
             "add_note, view_notes, get_dependency_graph, trace_failure, "
-            "submit_root_cause"
+            "get_runbook, submit_root_cause"
         ),
     )
     target: str = Field(
@@ -78,6 +78,7 @@ class SREObservation(BaseModel):
             "view_notes",
             "get_dependency_graph",
             "trace_failure {service}",
+            "get_runbook",
             "submit_root_cause {description}",
         ],
         description="Available commands the agent can use.",

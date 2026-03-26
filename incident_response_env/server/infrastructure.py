@@ -117,6 +117,19 @@ class SimulatedCluster:
 
         self.dependencies = dict(scenario.get("dependencies", {}))
         self.alerts = [dict(a) for a in scenario["alerts"]]
+
+        # Red herring noise alerts (auto-resolve after N steps)
+        self._noise_alerts = []
+        for na in scenario.get("noise_alerts", []):
+            alert = dict(na)
+            alert["_ttl"] = alert.pop("auto_resolve_after", 3)
+            self.alerts.append({
+                "service": alert["service"],
+                "alert_type": alert.get("alert_type", "noise"),
+                "severity": alert["severity"].lower(),
+                "message": alert["message"],
+            })
+            self._noise_alerts.append(alert)
         self.resolved = False
         self.root_cause_found = False
         self.submitted_root_cause = ""
@@ -174,6 +187,8 @@ class SimulatedCluster:
             return self._get_dependency_graph()
         elif command == "trace_failure":
             return self._trace_failure(target)
+        elif command == "get_runbook":
+            return self._get_runbook()
         elif command == "submit_root_cause":
             return self._submit_root_cause(target, parameters)
         else:
@@ -182,7 +197,7 @@ class SimulatedCluster:
                 "check_logs, get_metrics, list_alerts, check_dependencies, "
                 "restart_service, scale_up, rollback_deploy, kill_process, "
                 "check_process_list, check_network, add_note, view_notes, "
-                "get_dependency_graph, trace_failure, submit_root_cause."
+                "get_dependency_graph, trace_failure, get_runbook, submit_root_cause."
             )
 
     # ── Investigation commands ─────────────────────────────────────────────
@@ -478,6 +493,18 @@ class SimulatedCluster:
 
         return "\n".join(lines)
 
+    # ── Runbook ─────────────────────────────────────────────────────────────
+
+    def _get_runbook(self) -> str:
+        runbook = self.scenario.get("runbook", [])
+        if not runbook:
+            return "=== Runbook ===\n  No standard operating procedure available for this incident type."
+        lines = [f"=== Runbook: {self.scenario.get('name', 'Incident')} ==="]
+        for step in runbook:
+            lines.append(f"  {step}")
+        lines.append("\n  Follow these steps in order for optimal resolution.")
+        return "\n".join(lines)
+
     # ── Root cause submission ──────────────────────────────────────────────
 
     def _submit_root_cause(self, description: str, parameters: dict = None) -> str:
@@ -522,6 +549,14 @@ class SimulatedCluster:
         """Called each step. Handles malware respawn AND progressive degradation."""
         self._current_step += 1
         self._log_gen.advance()
+
+        # Auto-resolve noise alerts
+        for na in self._noise_alerts:
+            na["_ttl"] -= 1
+            if na["_ttl"] <= 0:
+                self.alerts = [a for a in self.alerts
+                               if not (a["service"] == na["service"] and a["message"] == na["message"])]
+        self._noise_alerts = [na for na in self._noise_alerts if na["_ttl"] > 0]
 
         # Malware respawn logic
         if self.restart_temporary and self.steps_since_restart >= 0:
