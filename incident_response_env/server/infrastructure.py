@@ -174,6 +174,8 @@ class SimulatedCluster:
             return self._get_dependency_graph()
         elif command == "trace_failure":
             return self._trace_failure(target)
+        elif command == "get_runbook":
+            return self._get_runbook()
         elif command == "submit_root_cause":
             return self._submit_root_cause(target, parameters)
         else:
@@ -182,7 +184,7 @@ class SimulatedCluster:
                 "check_logs, get_metrics, list_alerts, check_dependencies, "
                 "restart_service, scale_up, rollback_deploy, kill_process, "
                 "check_process_list, check_network, add_note, view_notes, "
-                "get_dependency_graph, trace_failure, submit_root_cause."
+                "get_dependency_graph, trace_failure, get_runbook, submit_root_cause."
             )
 
     # ── Investigation commands ─────────────────────────────────────────────
@@ -476,6 +478,18 @@ class SimulatedCluster:
         else:
             lines.append(f"  All upstream dependencies healthy.")
 
+        return "\n".join(lines)
+
+    # ── Runbook ─────────────────────────────────────────────────────────────
+
+    def _get_runbook(self) -> str:
+        runbook = self.scenario.get("runbook", [])
+        if not runbook:
+            return "=== Runbook ===\n  No standard operating procedure available for this incident type."
+        lines = [f"=== Runbook: {self.scenario.get('name', 'Incident')} ==="]
+        for step in runbook:
+            lines.append(f"  {step}")
+        lines.append("\n  Follow these steps in order for optimal resolution.")
         return "\n".join(lines)
 
     # ── Root cause submission ──────────────────────────────────────────────

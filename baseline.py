@@ -67,6 +67,7 @@ Available commands:
 - check_network {service}
 - add_note {text} — Save an observation to your evidence board
 - view_notes — Review your saved observations
+- get_runbook — Get the standard operating procedure for this incident type
 - submit_root_cause {description} — Put your diagnosis in the "target" field. This ENDS the episode.
 
 RESPONSE FORMAT — respond with ONLY a JSON object, no other text:

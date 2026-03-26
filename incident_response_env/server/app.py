@@ -420,6 +420,7 @@ a{color:var(--accent);text-decoration:none}
             <div class="cmd-list-item"><span class="cmd-name">check_network</span> <span class="cmd-arg">{service}</span></div>
             <div class="cmd-list-item"><span class="cmd-name">add_note</span> <span class="cmd-arg">{text}</span></div>
             <div class="cmd-list-item"><span class="cmd-name">view_notes</span></div>
+            <div class="cmd-list-item"><span class="cmd-name">get_runbook</span></div>
             <div class="cmd-list-item"><span class="cmd-name">submit_root_cause</span> <span class="cmd-arg">{diagnosis}</span></div>
           </div>
         </div>
@@ -717,7 +718,7 @@ function closeOverlay(e) {
   if (e.target === $('overlay')) $('overlay').classList.remove('visible');
 }
 
-var _autoExec = ['list_alerts','get_dependency_graph','view_notes'];
+var _autoExec = ['list_alerts','get_dependency_graph','view_notes','get_runbook'];
 
 function fillCmd(text) {
   var inp = $('cmd-input');
