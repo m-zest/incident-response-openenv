@@ -425,10 +425,10 @@ a{color:var(--accent);text-decoration:none}
               <h2>Welcome, On-Call Engineer</h2>
               <p>Select a difficulty tier and click <b>New Episode</b>.</p>
               <div class="tiers">
-                <span class="tier-tag tier-easy">Easy -- single alert, 10 steps</span>
-                <span class="tier-tag tier-medium">Medium -- correlated failures, 15 steps</span>
-                <span class="tier-tag tier-hard">Hard -- security ambiguity, 20 steps</span>
-                <span class="tier-tag tier-expert">Expert -- forensic investigation, 25 steps</span>
+                <span class="tier-tag tier-easy">Easy - single alert, 10 steps</span>
+                <span class="tier-tag tier-medium">Medium - correlated failures, 15 steps</span>
+                <span class="tier-tag tier-hard">Hard - security ambiguity, 20 steps</span>
+                <span class="tier-tag tier-expert">Expert - forensic investigation, 25 steps</span>
               </div>
               <p style="margin-top:20px;font-size:12px;color:var(--text-muted);line-height:1.8;max-width:420px">
                 1. Click alert service names to investigate<br>
@@ -927,7 +927,7 @@ async function loadBaseline() {
       {name:'Hard',   k:'hard',   ai:s.hard.ai,   human:s.hard.human,   n:s.hard.scenarios,   gap:(s.hard.human-s.hard.ai).toFixed(2),     status:'Very Hard',  color:'var(--orange)'},
       {name:'Expert', k:'expert', ai:s.expert.ai, human:s.expert.human, n:s.expert.scenarios, gap:(s.expert.human-s.expert.ai).toFixed(2), status:'Unsolved',   color:'var(--red)'}
     ];
-    var h = '<div class="pm-title">Baseline Performance -- Human vs AI</div>';
+    var h = '<div class="pm-title">Baseline Performance - Human vs AI</div>';
     h += '<p style="color:var(--text-muted);font-size:12px;margin-bottom:20px">Tested with ' + d.model + '</p>';
     h += '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px">';
     h += '<tr style="border-bottom:1px solid rgba(255,255,255,.08);color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">';

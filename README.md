@@ -77,17 +77,17 @@ Database split-brain during network partition (both nodes claim primary, writes 
 
 ## Key Features
 
-- **Dynamic state** -- systems degrade each step (CPU +0.5/step, latency x1.08, health -1.5/step), cascading to dependents after step 4, warnings escalate to critical at step 5
-- **Red herring alerts** -- noise alerts (backups, GC, auto-scaling) appear alongside real alerts and auto-resolve after 2-3 steps
-- **Action latency** -- heavy services (database, Redis) take 2 steps to restart; agent can investigate while waiting
-- **Runbooks** -- per-scenario standard operating procedures via `get_runbook`
-- **Evidence board** -- `add_note` / `view_notes` for tracking hypotheses across steps
-- **Dependency graph** -- NetworkX-powered `trace_failure` with blast radius and unhealthy path detection
-- **Kill process prerequisites** -- security scenarios require `check_process_list` before `kill_process`
-- **MCP tool discovery** -- `GET /mcp/tools` returns JSON schemas; expert scenarios dynamically revoke tools mid-episode (security lockdown)
-- **Post-mortem reports** -- `GET /postmortem` returns structured incident timeline with efficiency rating
-- **Seed reproducibility** -- `reset(seed=42)` produces identical episodes
-- **RL training ready** -- `examples/train_with_trl.py` shows HuggingFace TRL GRPOTrainer integration
+- **Dynamic state** -systems degrade each step (CPU +0.5/step, latency x1.08, health -1.5/step), cascading to dependents after step 4, warnings escalate to critical at step 5
+- **Red herring alerts** -noise alerts (backups, GC, auto-scaling) appear alongside real alerts and auto-resolve after 2-3 steps
+- **Action latency** -heavy services (database, Redis) take 2 steps to restart; agent can investigate while waiting
+- **Runbooks** -per-scenario standard operating procedures via `get_runbook`
+- **Evidence board** -`add_note` / `view_notes` for tracking hypotheses across steps
+- **Dependency graph** -NetworkX-powered `trace_failure` with blast radius and unhealthy path detection
+- **Kill process prerequisites** -security scenarios require `check_process_list` before `kill_process`
+- **MCP tool discovery** -`GET /mcp/tools` returns JSON schemas; expert scenarios dynamically revoke tools mid-episode (security lockdown)
+- **Post-mortem reports** -`GET /postmortem` returns structured incident timeline with efficiency rating
+- **Seed reproducibility** -`reset(seed=42)` produces identical episodes
+- **RL training ready** -`examples/train_with_trl.py` shows HuggingFace TRL GRPOTrainer integration
 
 ## API Endpoints
 
@@ -132,8 +132,8 @@ python baseline.py --task hard  # or: easy, medium, expert, or omit for all
 This environment is designed as a foundation for ongoing research. See [FUTURE_WORK.md](FUTURE_WORK.md) for the full technical roadmap.
 
 Key directions:
-- **Multi-agent orchestration** -- triage, diagnosis, remediation, and communication as separate specialized agents
-- **Hybrid-real infrastructure** -- actual Redis, SQLite, Nginx inside the container with chaos-engineered failures
+- **Multi-agent orchestration** -triage, diagnosis, remediation, and communication as separate specialized agents
+- **Hybrid-real infrastructure** -actual Redis, SQLite, Nginx inside the container with chaos-engineered failures
 - **Continuous RL training pipeline** via TRL/GRPO with curriculum learning
 - **Custom scenario builder** for company-specific topologies (JSON-driven, no code changes)
 - **Cross-model benchmark leaderboard** with seed-based reproducible evaluation
