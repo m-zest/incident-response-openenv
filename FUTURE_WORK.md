@@ -4,10 +4,10 @@
 
 The environment currently tests a single agent handling the full incident lifecycle. The next step is specialized agents collaborating on a single incident:
 
-- **Triage agent** (small, fast model) -- filters noise, deduplicates, prioritizes from hundreds of alerts
-- **Diagnosis agent** (large reasoning model) -- deep investigation, dependency chain tracing, hypothesis formation
-- **Remediation agent** (tool-use model) -- executes precise fixes, handles action latency and security lockdowns
-- **Communication agent** (writing model) -- writes post-mortem, notifies stakeholders, creates tickets
+- **Triage agent** (small, fast model) -filters noise, deduplicates, prioritizes from hundreds of alerts
+- **Diagnosis agent** (large reasoning model) -deep investigation, dependency chain tracing, hypothesis formation
+- **Remediation agent** (tool-use model) -executes precise fixes, handles action latency and security lockdowns
+- **Communication agent** (writing model) -writes post-mortem, notifies stakeholders, creates tickets
 
 The environment is agent-agnostic. It accepts commands via WebSocket from any source. Whether one agent sends all 17 commands or four agents each send a subset, scoring works identically.
 
@@ -17,11 +17,11 @@ The environment is agent-agnostic. It accepts commands via WebSocket from any so
 
 Run lightweight real services inside the Docker container alongside the simulation:
 
-- **Redis** (50MB) -- actual cache with real eviction metrics
-- **SQLite** -- actual database with 10K users, 50K transactions
-- **Nginx** -- actual web server returning real HTTP responses
-- **Worker process** -- actual background job processor
-- **Chaos engine** -- injects real failures (fill Redis memory, lock SQLite, kill worker PID, start CPU burner)
+- **Redis** (50MB) -actual cache with real eviction metrics
+- **SQLite** -actual database with 10K users, 50K transactions
+- **Nginx** -actual web server returning real HTTP responses
+- **Worker process** -actual background job processor
+- **Chaos engine** -injects real failures (fill Redis memory, lock SQLite, kill worker PID, start CPU burner)
 
 The hybrid approach: if real services are running, return real data. If unavailable, fall back to simulated JSON. Tests pass without real services. HF Spaces free tier can run Redis + SQLite.
 
