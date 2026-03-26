@@ -6,7 +6,7 @@ the hackathon-required endpoints: /tasks, /grader, /baseline, /web.
 """
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from openenv.core.env_server import create_fastapi_app
 
@@ -21,6 +21,12 @@ env = SREEnvironment()
 
 
 # ── API Endpoints ──────────────────────────────────────────────────────────
+
+
+@app.get("/")
+async def root():
+    """Redirect root to the web dashboard."""
+    return RedirectResponse(url="/web")
 
 
 @app.get("/health")
@@ -79,6 +85,7 @@ async def get_postmortem():
 class ResetRequest(BaseModel):
     task_id: str = "easy"
     scenario_index: int = -1
+    seed: int = -1
 
 
 class StepRequest(BaseModel):
@@ -101,7 +108,8 @@ def _obs_to_dict(obs: SREObservation) -> dict:
 
 @app.post("/web/reset")
 async def web_reset(req: ResetRequest):
-    obs = env.reset(task_id=req.task_id, scenario_index=req.scenario_index)
+    seed = req.seed if req.seed >= 0 else None
+    obs = env.reset(task_id=req.task_id, scenario_index=req.scenario_index, seed=seed)
     return _obs_to_dict(obs)
 
 
