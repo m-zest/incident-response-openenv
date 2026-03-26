@@ -29,13 +29,17 @@ def compute_step_reward(
         else:
             reward += 0.01  # Gathering info, but not the most relevant
 
-    # Checking dependencies (always slightly useful)
-    elif command == "check_dependencies":
+    # Checking dependencies / graph analysis (always useful)
+    elif command in ("check_dependencies", "get_dependency_graph", "trace_failure"):
         reward += 0.03
 
     # Listing alerts (useful first step)
     elif command == "list_alerts":
         reward += 0.02
+
+    # Evidence board (neutral — tracking, not acting)
+    elif command in ("add_note", "view_notes"):
+        reward += 0.0
 
     # Restarting services
     elif command == "restart_service":
