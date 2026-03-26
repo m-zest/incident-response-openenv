@@ -125,7 +125,9 @@ def _obs_to_dict(obs: SREObservation) -> dict:
 async def web_reset(req: ResetRequest):
     seed = req.seed if req.seed >= 0 else None
     obs = env.reset(task_id=req.task_id, scenario_index=req.scenario_index, seed=seed)
-    return _obs_to_dict(obs)
+    result = _obs_to_dict(obs)
+    result["services"] = sorted(env._cluster.services.keys()) if env._cluster else []
+    return result
 
 
 @app.post("/web/step")
@@ -332,6 +334,16 @@ a{color:var(--accent);text-decoration:none}
   font-family:var(--mono);font-size:13px;transition:border-color .2s,box-shadow .2s}
 .cmd-input:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px var(--accent-glow)}
 .cmd-input::placeholder{color:var(--text-muted)}.cmd-input:disabled{opacity:.25}
+.svc-picker{display:none;position:absolute;bottom:100%;left:0;right:0;margin-bottom:6px;
+  padding:6px;background:var(--bg-elevated);border:1px solid var(--border-hover);
+  border-radius:var(--r);box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:50;
+  flex-wrap:wrap;gap:6px}
+.svc-picker.visible{display:flex}
+.svc-chip{padding:5px 12px;font-family:var(--mono);font-size:11px;color:var(--text);
+  background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);
+  border-radius:16px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.svc-chip:hover{background:rgba(139,92,246,.2);border-color:var(--accent);color:var(--text-bright)}
+.cmd-wrap{position:relative;flex:1;display:flex}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.80);backdrop-filter:blur(10px);
   display:flex;align-items:center;justify-content:center;z-index:100;
   opacity:0;pointer-events:none;transition:opacity .3s}
@@ -518,8 +530,11 @@ a{color:var(--accent);text-decoration:none}
       <option value="expert">Expert</option>
     </select>
     <button class="btn btn-new" onclick="startEpisode()">New Episode</button>
-    <input id="cmd-input" class="cmd-input" placeholder="Type command... e.g., check_logs payment-service"
-           disabled onkeydown="if(event.key==='Enter')executeCmd()">
+    <div class="cmd-wrap">
+      <div id="svc-picker" class="svc-picker"></div>
+      <input id="cmd-input" class="cmd-input" placeholder="Type a command... e.g. check_logs payment-service"
+             disabled onkeydown="if(event.key==='Enter')executeCmd()" oninput="onCmdInput()">
+    </div>
     <button id="exec-btn" class="btn btn-exec" onclick="executeCmd()" disabled>Execute</button>
   </div>
 </div>
@@ -665,6 +680,8 @@ async function startEpisode() {
     });
     const data = await res.json();
     episodeActive = true;
+    _currentServices = data.services || [];
+    hideServicePicker();
     $('cmd-input').disabled = false;
     $('exec-btn').disabled = false;
     $('cmd-input').focus();
@@ -740,20 +757,58 @@ function closeOverlay(e) {
 }
 
 var _autoExec = ['list_alerts','get_dependency_graph','view_notes','get_runbook'];
+var _noService = ['list_alerts','get_dependency_graph','view_notes','get_runbook','submit_root_cause','add_note'];
+var _currentServices = [];
+var _pendingCmd = '';
+
+function showServicePicker(cmd) {
+  _pendingCmd = cmd;
+  var picker = $('svc-picker');
+  picker.innerHTML = _currentServices.map(function(s) {
+    return '<div class="svc-chip" onclick="pickService(&quot;'+s+'&quot;)">' + s + '</div>';
+  }).join('');
+  picker.classList.add('visible');
+}
+
+function hideServicePicker() { $('svc-picker').classList.remove('visible'); _pendingCmd = ''; }
+
+function pickService(svc) {
+  var inp = $('cmd-input');
+  inp.value = _pendingCmd + svc;
+  hideServicePicker();
+  executeCmd();
+}
+
+function onCmdInput() {
+  var val = $('cmd-input').value.trim();
+  var words = val.split(/\\s+/);
+  // Hide picker if user types manually
+  if (words.length >= 2) hideServicePicker();
+}
 
 function fillCmd(text) {
   var inp = $('cmd-input');
   if (inp.disabled) return;
   var cmd = text.trim();
+  // Auto-execute commands that need no argument
   if (_autoExec.indexOf(cmd) >= 0) {
     inp.value = cmd;
+    hideServicePicker();
     executeCmd();
     return;
   }
   inp.value = text;
   inp.focus();
-  inp.setAttribute('placeholder', '\u2190 type service name here');
-  setTimeout(function() { inp.setAttribute('placeholder', 'Type a command... e.g. check_logs payment-service'); }, 4000);
+  // Show service picker for commands that need a service
+  var base = cmd.replace(/\\s+$/, '');
+  if (_noService.indexOf(base) < 0 && _currentServices.length > 0) {
+    showServicePicker(text);
+    inp.setAttribute('placeholder', '\u2190 pick a service or type one');
+  } else {
+    hideServicePicker();
+    inp.setAttribute('placeholder', '\u2190 type argument and press Enter');
+  }
+  setTimeout(function() { inp.setAttribute('placeholder', 'Type a command... e.g. check_logs payment-service'); }, 5000);
 }
 
 // Make command list items clickable
@@ -763,6 +818,10 @@ document.addEventListener('DOMContentLoaded', function() {
       var name = el.querySelector('.cmd-name');
       if (name) fillCmd(name.textContent + ' ');
     });
+  });
+  // Close picker on outside click
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.cmd-wrap') && !e.target.closest('.cmd-list-item')) hideServicePicker();
   });
 });
 
