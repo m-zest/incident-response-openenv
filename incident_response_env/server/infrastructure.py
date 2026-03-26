@@ -434,19 +434,12 @@ class SimulatedCluster:
             return "ERROR: No PID specified. Usage: kill_process {service} with parameters: {\"pid\": \"1234\"}"
 
         if self.malicious_pid and pid == str(self.malicious_pid) and service == self.fix_target:
-            # Require BOTH check_process_list AND check_network before kill_process
+            # Require check_process_list before kill_process
             if service not in self._process_checked:
                 return (
                     f"Cannot kill PID {pid} on {service}.\n"
                     f"ERROR: You must investigate running processes first "
                     f"(check_process_list {service}) before terminating."
-                )
-            if service not in self._network_checked:
-                return (
-                    f"Cannot kill PID {pid} on {service}.\n"
-                    f"ERROR: You must investigate network connections "
-                    f"(check_network {service}) to confirm the threat before "
-                    f"terminating processes."
                 )
             procs = self.services[service].get("processes", [])
             self.services[service]["processes"] = [

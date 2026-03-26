@@ -159,6 +159,7 @@
           "[2026-03-25T14:40:00Z] INFO   Memory usage: 250MB / 1024MB. Normal.",
           "[2026-03-25T14:45:00Z] INFO   Processed 12 service mesh sync requests",
           "[2026-03-25T14:48:00Z] INFO   Sync v4.1.0 applied to mesh layer",
+          "[2026-03-25T14:48:08Z] INFO   mesh sync v4.1.0: 3 service certificates rotated",
           "[2026-03-25T14:48:10Z] INFO   Mesh sync completed: 6/6 nodes acknowledged",
           "[2026-03-25T14:50:00Z] INFO   All endpoints healthy. No errors."
         ],
