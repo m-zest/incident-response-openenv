@@ -717,11 +717,21 @@ function closeOverlay(e) {
   if (e.target === $('overlay')) $('overlay').classList.remove('visible');
 }
 
+var _autoExec = ['list_alerts','get_dependency_graph','view_notes'];
+
 function fillCmd(text) {
-  const inp = $('cmd-input');
+  var inp = $('cmd-input');
   if (inp.disabled) return;
+  var cmd = text.trim();
+  if (_autoExec.indexOf(cmd) >= 0) {
+    inp.value = cmd;
+    executeCmd();
+    return;
+  }
   inp.value = text;
   inp.focus();
+  inp.setAttribute('placeholder', '\u2190 type service name here');
+  setTimeout(function() { inp.setAttribute('placeholder', 'Type a command... e.g. check_logs payment-service'); }, 4000);
 }
 
 // Make command list items clickable

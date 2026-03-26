@@ -5,7 +5,7 @@
     "description": "A malicious crypto-miner has been deployed on the payment service, consuming CPU and causing cascading failures. Restarting the service only temporarily fixes it as the malware auto-restarts.",
     "initial_health": 25,
     "max_steps": 20,
-    "optimal_steps": 7,
+    "optimal_steps": 9,
     "root_cause": "crypto_mining_attack",
     "root_cause_service": "payment-service",
     "root_cause_keywords": ["crypto", "mining", "attack", "malware", "malicious", "security", "breach", "payment-service", "unauthorized"],
@@ -39,17 +39,22 @@
         "processes": [
           "PID 1      node payment.js               4.2% CPU   380MB RAM",
           "PID 412    node payment-scheduler.js      0.8% CPU    45MB RAM",
-          "PID 9821   payment-worker-2              93.1% CPU  3280MB RAM",
+          "PID 518    node payment-batch-proc        1.2% CPU    68MB RAM",
+          "PID 9821   [payment-gc-compactor]        93.1% CPU  3280MB RAM",
           "PID 50     nginx                          0.3% CPU    15MB RAM",
-          "PID 88     node healthcheck.js            0.1% CPU    12MB RAM"
+          "PID 88     node healthcheck.js            0.1% CPU    12MB RAM",
+          "PID 102    node payment-retry-queue       0.4% CPU    28MB RAM",
+          "PID 119    tail -f /var/log/payment.log   0.0% CPU     4MB RAM"
         ],
         "network": [
           "LISTEN      0.0.0.0:8082  (payment-service)",
-          "ESTABLISHED 10.0.1.7:8082 -> 10.0.1.10:5432  (database-primary)",
-          "ESTABLISHED 10.0.1.7:8082 -> 10.0.1.8:8080   (api-gateway)",
-          "ESTABLISHED 10.0.1.7:8082 -> 10.0.1.9:6379   (cache-redis)",
+          "ESTABLISHED 10.0.1.7:8082  -> 10.0.1.10:5432  (database-primary)",
+          "ESTABLISHED 10.0.1.7:8082  -> 10.0.1.8:8080   (api-gateway)",
+          "ESTABLISHED 10.0.1.7:8082  -> 10.0.1.9:6379   (cache-redis)",
+          "ESTABLISHED 10.0.1.7:38210 -> 10.0.1.11:5672   (worker-queue)",
           "ESTABLISHED 10.0.1.7:44892 -> 45.33.32.156:4444",
-          "ESTABLISHED 10.0.1.7:44893 -> 185.220.101.34:3333"
+          "ESTABLISHED 10.0.1.7:44893 -> 185.220.101.34:3333",
+          "ESTABLISHED 10.0.1.7:8082  -> 10.0.1.5:3000   (frontend)"
         ]
       },
       "frontend": {
@@ -120,7 +125,7 @@
     "description": "A bad configuration push to the service mesh sidecar has caused cascading TLS failures across the cluster. Services are failing in sequence as they try to communicate.",
     "initial_health": 20,
     "max_steps": 20,
-    "optimal_steps": 7,
+    "optimal_steps": 10,
     "root_cause": "corrupted_config_push",
     "root_cause_service": "config-server",
     "root_cause_keywords": ["config", "configuration", "push", "sidecar", "envoy", "tls", "mesh", "config-server", "rollback"],
@@ -130,18 +135,20 @@
       {"service": "user-service", "alert_type": "tls_handshake_failure", "severity": "critical", "message": "TLS handshake failures to database-primary: certificate mismatch"},
       {"service": "payment-service", "alert_type": "tls_handshake_failure", "severity": "critical", "message": "TLS handshake failures to cache-redis: certificate mismatch"},
       {"service": "api-gateway", "alert_type": "error_rate_high", "severity": "critical", "message": "Error rate 92% - all downstream services unreachable"},
-      {"service": "frontend", "alert_type": "complete_outage", "severity": "critical", "message": "All API calls failing. Site completely down."},
-      {"service": "config-server", "alert_type": "deployment_completed", "severity": "info", "message": "Config push v4.1.0 completed 12 minutes ago"}
+      {"service": "frontend", "alert_type": "complete_outage", "severity": "critical", "message": "All API calls failing. Site completely down."}
     ],
     "services": {
       "config-server": {
         "status": "healthy",
         "healthy": true,
         "logs": [
-          "[2026-03-25T14:48:00Z] INFO   Config push v4.1.0 initiated by deploy-bot",
-          "[2026-03-25T14:48:05Z] INFO   Distributing new sidecar TLS certificates to all services",
-          "[2026-03-25T14:48:10Z] INFO   Push completed to 6/6 services",
-          "[2026-03-25T14:48:12Z] INFO   Config version v4.1.0 active across cluster"
+          "[2026-03-25T14:30:00Z] INFO   Scheduled health check: all endpoints responding",
+          "[2026-03-25T14:35:00Z] INFO   Certificate rotation check: next rotation in 14 days",
+          "[2026-03-25T14:40:00Z] INFO   Memory usage: 250MB / 1024MB. Normal.",
+          "[2026-03-25T14:45:00Z] INFO   Processed 12 configuration sync requests",
+          "[2026-03-25T14:48:00Z] INFO   Routine config sync v4.1.0 applied",
+          "[2026-03-25T14:48:10Z] INFO   Sync completed to 6/6 services",
+          "[2026-03-25T14:50:00Z] INFO   All endpoints healthy. No errors."
         ],
         "metrics": {"cpu": 8, "memory": 25, "disk": 15, "latency_ms": 5, "connections": 12, "max_connections": 50},
         "processes": [

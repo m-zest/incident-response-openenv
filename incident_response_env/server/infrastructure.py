@@ -125,6 +125,7 @@ class SimulatedCluster:
         self.correct_investigations: list[str] = []
         self.destructive_actions = 0
         self.steps_since_restart = 0
+        self._network_checked: set = set()
 
         # Evidence board for agent notes
         self.evidence_board: list[dict] = []
@@ -246,6 +247,7 @@ class SimulatedCluster:
         if service not in self.services:
             return f"ERROR: Service '{service}' not found."
         self.investigated_services.append(service)
+        self._network_checked.add(service)
         if service == self.root_cause_service:
             self.correct_investigations.append(service)
         net = self.services[service].get("network", [])
@@ -350,6 +352,14 @@ class SimulatedCluster:
             return "ERROR: No PID specified. Usage: kill_process {service} with parameters: {\"pid\": \"1234\"}"
 
         if self.malicious_pid and pid == str(self.malicious_pid) and service == self.fix_target:
+            # Require check_network on this service before kill_process works
+            if service not in self._network_checked:
+                return (
+                    f"Cannot kill PID {pid} on {service}.\n"
+                    f"ERROR: You must investigate network connections first "
+                    f"(check_network {service}) to confirm the threat before "
+                    f"terminating processes."
+                )
             procs = self.services[service].get("processes", [])
             self.services[service]["processes"] = [
                 p for p in procs if f"PID {pid}" not in p
