@@ -92,6 +92,7 @@ class SREEnvironment(Environment):
 
         # Initialize the simulated cluster with seed
         self._cluster = SimulatedCluster(scenario, seed=seed)
+        self._steps_since_fix = 0
 
         # Initialize episode state
         self._state = SREState(
@@ -189,13 +190,26 @@ class SREEnvironment(Environment):
         # Apply time-based effects (e.g., malware respawning)
         self._cluster.tick()
 
-        # Nudge agent to submit diagnosis after a successful fix
-        if (action.command in ("restart_service", "rollback_deploy", "scale_up")
-                and self._cluster.health >= 85 and self._cluster.resolved):
-            output += (
-                "\n\nSystem restored. Submit your root cause diagnosis with: "
-                "submit_root_cause {description}"
-            )
+        # Track steps since fix for escalating nudge
+        if self._cluster.resolved and self._cluster.health >= 85:
+            if not hasattr(self, '_steps_since_fix'):
+                self._steps_since_fix = 0
+            self._steps_since_fix += 1
+
+            if action.command in ("restart_service", "rollback_deploy", "scale_up", "kill_process"):
+                self._steps_since_fix = 1
+                output += (
+                    "\n\nIMPORTANT: System restored. You MUST now submit your "
+                    "root cause diagnosis to complete the incident. Use: "
+                    "submit_root_cause {your diagnosis}"
+                )
+            elif action.command != "submit_root_cause" and self._steps_since_fix >= 2:
+                output += (
+                    "\n\nEpisode will end soon. Submit root cause now with: "
+                    "submit_root_cause {your diagnosis}"
+                )
+        else:
+            self._steps_since_fix = 0
 
         # Update state from cluster
         self._state.current_health = self._cluster.health
