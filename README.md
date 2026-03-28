@@ -7,9 +7,9 @@ sdk: docker
 pinned: false
 ---
 
-# Incident Response SRE Environment
+# Incident Response SRE Reinforcement Learning Environment
 
-An OpenEnv-compatible RL environment where an AI agent acts as an on-call SRE engineer diagnosing production infrastructure failures. 14 scenarios across 4 difficulty tiers test investigation, multi-step reasoning, security analysis, and calibrated restraint.
+An OpenEnv-compatible Reinforcement Learning environment where an AI agent acts as an on-call SRE engineer diagnosing production infrastructure failures. 14 scenarios across 4 difficulty tiers test investigation, multi-step reasoning, security analysis, and calibrated restraint.
 
 [![OpenEnv](https://img.shields.io/badge/OpenEnv-Compatible-blue)](https://github.com/meta-pytorch/OpenEnv)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-green)](https://python.org)
