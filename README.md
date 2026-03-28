@@ -13,7 +13,7 @@ An OpenEnv-compatible RL environment where an AI agent acts as an on-call SRE en
 
 [![OpenEnv](https://img.shields.io/badge/OpenEnv-Compatible-blue)](https://github.com/meta-pytorch/OpenEnv)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-green)](https://python.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue)](LICENSE)
 
 Built for the [OpenEnv AI Hackathon](https://pytorch.org/event/openenv-ai-hackathon/) (Meta x Hugging Face x PyTorch).
 
