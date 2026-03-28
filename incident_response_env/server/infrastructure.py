@@ -111,7 +111,7 @@ class SimulatedCluster:
     when services are unavailable.
     """
 
-    def __init__(self, scenario: dict, seed: int = None):
+    def __init__(self, scenario: dict, seed: int = None, mode: str = "auto"):
         self.scenario = scenario
         self.scenario_id = scenario["id"]
         self.root_cause = scenario["root_cause"]
@@ -196,22 +196,25 @@ class SimulatedCluster:
                 self._dep_graph.add_edge(svc, dep)  # svc depends on dep
 
         # Hybrid-real infrastructure (optional, cached singleton)
+        # mode="auto": use hybrid when available; mode="simulated": pure simulation
         self._real_metrics = None
         self._chaos_engine = None
         self._hybrid_mode = False
-        try:
-            metrics, chaos = _get_hybrid_services()
-            if metrics is not None:
-                self._real_metrics = metrics
-                self._chaos_engine = chaos
-                self._hybrid_mode = True
-                chaos.inject(self.scenario_id)
-                logger.info(
-                    "Hybrid mode active: redis=%s sqlite=%s scenario=%s",
-                    metrics.redis_available, metrics.sqlite_available, self.scenario_id,
-                )
-        except Exception as e:
-            logger.debug("Hybrid infrastructure not available: %s", e)
+        self._mode = mode
+        if mode != "simulated":
+            try:
+                metrics, chaos = _get_hybrid_services()
+                if metrics is not None:
+                    self._real_metrics = metrics
+                    self._chaos_engine = chaos
+                    self._hybrid_mode = True
+                    chaos.inject(self.scenario_id)
+                    logger.info(
+                        "Hybrid mode active: redis=%s sqlite=%s scenario=%s",
+                        metrics.redis_available, metrics.sqlite_available, self.scenario_id,
+                    )
+            except Exception as e:
+                logger.debug("Hybrid infrastructure not available: %s", e)
 
     def cleanup_chaos(self):
         if self._chaos_engine:

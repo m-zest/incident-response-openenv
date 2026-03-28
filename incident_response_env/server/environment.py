@@ -67,7 +67,7 @@ class SREEnvironment(Environment):
             "expert": load_scenarios("expert"),
         }
 
-    def reset(self, task_id: str = "easy", scenario_index: int = -1, seed: int = None) -> SREObservation:
+    def reset(self, task_id: str = "easy", scenario_index: int = -1, seed: int = None, mode: str = "auto") -> SREObservation:
         """
         Initialize a new incident episode.
 
@@ -75,6 +75,7 @@ class SREEnvironment(Environment):
             task_id: Difficulty tier - "easy", "medium", "hard", or "expert"
             scenario_index: Specific scenario index, or -1 for random
             seed: Optional seed for reproducibility. None = random seed.
+            mode: "auto" uses hybrid-real when available, "simulated" forces pure simulation.
         """
         # Clean up previous chaos injections
         if self._cluster is not None:
@@ -95,7 +96,7 @@ class SREEnvironment(Environment):
             scenario = scenarios[scenario_index]
 
         # Initialize the simulated cluster with seed
-        self._cluster = SimulatedCluster(scenario, seed=seed)
+        self._cluster = SimulatedCluster(scenario, seed=seed, mode=mode)
         self._steps_since_fix = 0
 
         # Initialize episode state

@@ -167,12 +167,14 @@ class ResetRequest(BaseModel):
     task_id: str = "easy"
     scenario_index: int = -1
     seed: int = -1
+    mode: str = "auto"
 
 
 class StepRequest(BaseModel):
     command: str
     target: str = ""
     parameters: dict = {}
+    mode: str = "auto"
 
 
 def _obs_to_dict(obs: SREObservation) -> dict:
@@ -190,9 +192,10 @@ def _obs_to_dict(obs: SREObservation) -> dict:
 @app.post("/web/reset")
 async def web_reset(req: ResetRequest):
     seed = req.seed if req.seed >= 0 else None
-    obs = env.reset(task_id=req.task_id, scenario_index=req.scenario_index, seed=seed)
+    obs = env.reset(task_id=req.task_id, scenario_index=req.scenario_index, seed=seed, mode=req.mode)
     result = _obs_to_dict(obs)
     result["services"] = sorted(env._cluster.services.keys()) if env._cluster else []
+    result["hybrid_active"] = env._cluster._hybrid_mode if env._cluster else False
     return result
 
 
@@ -205,6 +208,23 @@ async def web_step(req: StepRequest):
     result["grader"] = env.get_grader_result() if obs.done else None
     return result
 
+
+
+@app.get("/web/hybrid-status")
+async def hybrid_status():
+    """Check if real infrastructure services are available."""
+    try:
+        from .infrastructure import _get_hybrid_services
+        metrics, _ = _get_hybrid_services()
+        if metrics is not None:
+            return {
+                "available": True,
+                "redis": metrics.redis_available,
+                "sqlite": metrics.sqlite_available,
+            }
+    except Exception:
+        pass
+    return {"available": False, "redis": False, "sqlite": False}
 
 
 # ── Web Dashboard ─────────────────────────────────────────────────────────
@@ -388,6 +408,16 @@ a{color:var(--accent);text-decoration:none}
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236B7280'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 12px center;padding-right:30px;transition:border-color .2s}
 .task-pill:focus{border-color:var(--border-focus)}
+.mode-toggle{display:flex;align-items:center;background:var(--bg-input);border:1px solid var(--border);
+  border-radius:24px;overflow:hidden;flex-shrink:0}
+.mode-opt{padding:8px 14px;font-size:12px;font-weight:500;color:var(--text-dim);cursor:pointer;
+  transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:6px;
+  border:none;background:none;font-family:var(--sans)}
+.mode-opt.active{color:var(--text-bright);background:rgba(139,92,246,.15)}
+.mode-opt:hover:not(.active){color:var(--text);background:rgba(255,255,255,.03)}
+.mode-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.mode-dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+.mode-dot.off{background:var(--text-muted)}
 .btn{padding:9px 20px;cursor:pointer;font-weight:600;border:none;border-radius:24px;
   transition:all .2s;font-size:13px}
 .btn:hover{transform:translateY(-1px)}.btn:active{transform:none}
@@ -613,6 +643,10 @@ a{color:var(--accent);text-decoration:none}
       <option value="hard">Hard</option>
       <option value="expert">Expert</option>
     </select>
+    <div class="mode-toggle" id="mode-toggle">
+      <button class="mode-opt active" data-mode="simulated" onclick="setMode('simulated')">Simulated</button>
+      <button class="mode-opt" data-mode="hybrid" onclick="setMode('hybrid')">Hybrid-Real <span id="hybrid-dot" class="mode-dot off"></span></button>
+    </div>
     <button class="btn btn-new" onclick="startEpisode()">New Episode</button>
     <div class="cmd-wrap">
       <div id="svc-picker" class="svc-picker"></div>
@@ -780,10 +814,14 @@ async function startEpisode() {
   try {
     const res = await fetch('/web/reset', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ task_id: taskId })
+      body: JSON.stringify({ task_id: taskId, mode: _envMode === 'hybrid' ? 'auto' : 'simulated' })
     });
     const data = await res.json();
     episodeActive = true;
+    if (typeof data.hybrid_active !== 'undefined') {
+      var dot = $('hybrid-dot');
+      if (dot) { dot.classList.toggle('on', data.hybrid_active); dot.classList.toggle('off', !data.hybrid_active); }
+    }
     _currentServices = data.services || [];
     hideServicePicker();
     $('cmd-input').disabled = false;
@@ -860,6 +898,30 @@ function showSummary(data) {
 function closeOverlay(e) {
   if (e.target === $('overlay')) $('overlay').classList.remove('visible');
 }
+
+var _envMode = 'simulated';
+var _hybridAvailable = false;
+
+function setMode(mode) {
+  _envMode = mode;
+  document.querySelectorAll('.mode-opt').forEach(function(el) {
+    el.classList.toggle('active', el.getAttribute('data-mode') === mode);
+  });
+}
+
+(async function checkHybridStatus() {
+  try {
+    var res = await fetch('/web/hybrid-status');
+    var d = await res.json();
+    _hybridAvailable = d.available;
+    var dot = $('hybrid-dot');
+    if (dot) {
+      dot.classList.toggle('on', d.available);
+      dot.classList.toggle('off', !d.available);
+    }
+    if (d.available) setMode('hybrid');
+  } catch(e) {}
+})();
 
 var _autoExec = ['list_alerts','get_dependency_graph','view_notes','get_runbook'];
 var _noService = ['list_alerts','get_dependency_graph','view_notes','get_runbook','submit_root_cause','add_note'];
