@@ -49,11 +49,7 @@ async def get_grader():
 
 @app.get("/baseline")
 async def get_baseline():
-    """
-    Return baseline scores for all 4 tasks.
-    In production, this runs the baseline agent. Here we return
-    pre-computed scores from our baseline runs.
-    """
+    """Return baseline scores, walkthroughs, and AI-vs-human comparison."""
     return {
         "model": "nvidia/nemotron-3-super-120b-a12b",
         "scores": {
@@ -64,6 +60,60 @@ async def get_baseline():
         },
         "total_scenarios": 14,
         "note": "Expert tier is fully solvable by humans (0.74 in 9 steps) but defeats the 120B parameter model, demonstrating significant RL training potential.",
+        "walkthroughs": {
+            "easy": {
+                "scenario": "Disk Full on Log Server",
+                "optimal_steps": [
+                    "check_logs log-server",
+                    "restart_service log-server",
+                    "submit_root_cause disk full on log-server, /var/log at 98%, log rotation stopped",
+                ],
+                "expected_score": 0.87,
+                "explanation": "Direct investigation of alerting service, confirm root cause in logs, restart to clear, diagnose.",
+            },
+            "medium": {
+                "scenario": "Database Connection Pool Exhaustion",
+                "optimal_steps": [
+                    "check_logs database-primary",
+                    "get_metrics database-primary",
+                    "check_dependencies database-primary",
+                    "check_logs user-service",
+                    "restart_service database-primary",
+                    "submit_root_cause slow query causing lock contention, exhausting connection pool on database-primary",
+                ],
+                "expected_score": 0.80,
+                "explanation": "Follow the dependency chain: DB logs reveal slow queries, metrics confirm pool saturation, trace upstream, fix, diagnose.",
+            },
+            "hard": {
+                "scenario": "Crypto-Mining Attack Disguised as Memory Leak",
+                "optimal_steps": [
+                    "check_logs payment-service",
+                    "get_metrics payment-service",
+                    "check_process_list payment-service",
+                    "check_network payment-service",
+                    "kill_process payment-service (pid=9821)",
+                    "submit_root_cause crypto mining malware attack on payment-service, unauthorized process xmrig",
+                ],
+                "expected_score": 0.87,
+                "explanation": "Key insight: check_process_list reveals disguised miner. Must kill_process (not restart), then verify via network connections.",
+            },
+            "expert": {
+                "scenario": "Database Split-Brain During Network Partition",
+                "optimal_steps": [
+                    "check_logs database-primary",
+                    "check_logs database-replica",
+                    "get_metrics database-primary",
+                    "get_metrics database-replica",
+                    "check_network network-switch",
+                    "check_logs network-switch",
+                    "get_dependency_graph",
+                    "restart_service database-replica",
+                    "submit_root_cause network partition caused split-brain, both databases accepting writes independently",
+                ],
+                "expected_score": 0.74,
+                "explanation": "Must investigate both DB nodes to detect divergent WAL positions. Network switch reveals the partition. Fence the replica, not the primary.",
+            },
+        },
     }
 
 
@@ -963,6 +1013,49 @@ async function loadBaseline() {
     h += '<p style="color:var(--text-dim);font-size:12px;margin-bottom:6px">Total scenarios: ' + d.total_scenarios + '</p>';
     h += '<p style="color:var(--text-dim);font-size:12px;margin-bottom:24px">' + (d.note || '') + '</p>';
     h += '<div style="max-width:500px;height:220px;margin:0 auto"><canvas id="bl-chart"></canvas></div>';
+
+    // Walkthroughs
+    var wt = d.walkthroughs;
+    if (wt) {
+      h += '<div style="margin-top:36px;border-top:1px solid rgba(255,255,255,.06);padding-top:28px">';
+      h += '<div class="pm-title">Optimal Walkthroughs</div>';
+      h += '<p style="color:var(--text-muted);font-size:12px;margin-bottom:24px">Step-by-step solutions for one scenario per tier. Follow along in the dashboard to verify.</p>';
+      var tierOrder = ['easy','medium','hard','expert'];
+      var tierLabels = {easy:'Easy',medium:'Medium',hard:'Hard',expert:'Expert'};
+      var tierColors = {easy:'var(--green)',medium:'var(--yellow)',hard:'var(--orange)',expert:'var(--red)'};
+      tierOrder.forEach(function(tk) {
+        var w = wt[tk];
+        if (!w) return;
+        h += '<div style="margin-bottom:28px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:20px;animation:fadeSlide .3s ease">';
+        h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">';
+        h += '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + tierColors[tk] + '"></span>';
+        h += '<span style="font-weight:600;color:var(--text-bright);font-size:14px">' + tierLabels[tk] + ': ' + w.scenario + '</span>';
+        h += '<span style="margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--accent)">Score: ' + w.expected_score.toFixed(2) + '</span>';
+        h += '</div>';
+        h += '<div style="margin-bottom:12px">';
+        w.optimal_steps.forEach(function(step, idx) {
+          var isInvestigate = step.startsWith('check_') || step.startsWith('get_') || step.startsWith('list_') || step.startsWith('trace_');
+          var isFix = step.startsWith('restart_') || step.startsWith('kill_') || step.startsWith('rollback_') || step.startsWith('scale_');
+          var isSubmit = step.startsWith('submit_');
+          var stepColor = isSubmit ? 'var(--accent)' : isFix ? 'var(--green)' : 'var(--cyan)';
+          var icon = isSubmit ? '&#10003;' : isFix ? '&#9881;' : '&#9658;';
+          h += '<div style="display:flex;align-items:flex-start;gap:12px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.03)">';
+          h += '<span style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--text-dim)">' + (idx+1) + '</span>';
+          h += '<div style="flex:1;min-width:0">';
+          h += '<code style="font-family:var(--mono);font-size:12px;color:' + stepColor + ';word-break:break-all">' + step + '</code>';
+          h += '</div>';
+          h += '<span style="flex-shrink:0;font-size:10px;color:var(--text-muted);margin-top:2px">' + icon + '</span>';
+          h += '</div>';
+        });
+        h += '</div>';
+        h += '<div style="font-size:12px;color:var(--text-dim);padding:10px 12px;background:rgba(139,92,246,.06);border-radius:var(--r-sm);border-left:3px solid var(--accent)">';
+        h += '<strong style="color:var(--text)">Strategy:</strong> ' + w.explanation;
+        h += '</div>';
+        h += '</div>';
+      });
+      h += '</div>';
+    }
+
     $('bl-content').innerHTML = h;
     // Render chart
     var ctx2 = document.getElementById('bl-chart').getContext('2d');
