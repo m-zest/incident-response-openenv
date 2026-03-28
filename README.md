@@ -1,3 +1,12 @@
+---
+title: SRE Incident Response Simulator
+emoji: 🚨
+colorFrom: red
+colorTo: gray
+sdk: docker
+pinned: false
+---
+
 # Incident Response SRE Environment
 
 An OpenEnv-compatible RL environment where an AI agent acts as an on-call SRE engineer diagnosing production infrastructure failures. 14 scenarios across 4 difficulty tiers test investigation, multi-step reasoning, security analysis, and calibrated restraint.
