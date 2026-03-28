@@ -35,4 +35,4 @@ include = ["incident_response_env*"]
 testpaths = ["tests"]
 
 [project.scripts]
-server = "incident_response_env.server.app:app"
+server = "server.app:main"
