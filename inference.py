@@ -3,17 +3,17 @@
 Baseline inference script for the Incident Response SRE Environment.
 
 Connects an LLM (via OpenAI-compatible API) to the environment and
-runs it through all 3 task tiers, reporting scores.
+runs it through all 4 task tiers, reporting scores.
 
 Usage:
     # With Groq (free, Llama 3.3 70B):
-    HF_TOKEN=your-groq-key API_BASE_URL=https://api.groq.com/openai/v1 python baseline.py
+    HF_TOKEN=your-groq-key python inference.py
 
     # With NVIDIA Nemotron (free tier):
-    HF_TOKEN=your-nvidia-key API_BASE_URL=https://integrate.api.nvidia.com/v1 python baseline.py
+    HF_TOKEN=your-nvidia-key API_BASE_URL=https://integrate.api.nvidia.com/v1 python inference.py
 
     # With OpenAI:
-    HF_TOKEN=your-key python baseline.py
+    API_KEY=your-key API_BASE_URL=https://api.openai.com/v1 MODEL_NAME=gpt-4o python inference.py
 """
 
 import argparse
@@ -24,14 +24,12 @@ import sys
 from openai import OpenAI, RateLimitError, APITimeoutError, APIConnectionError
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-# Add parent to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from incident_response_env.models import SREAction
 from incident_response_env.server.environment import SREEnvironment
 
-# Configuration
-API_KEY = os.environ.get("HF_TOKEN", "")
+API_KEY = os.environ.get("HF_TOKEN") or os.environ.get("API_KEY", "")
 BASE_URL = os.environ.get("API_BASE_URL", "https://api.groq.com/openai/v1")
 MODEL = os.environ.get("MODEL_NAME", "llama-3.3-70b-versatile")
 
@@ -59,41 +57,23 @@ Available commands:
 - get_metrics {service}
 - list_alerts
 - check_dependencies {service}
-- get_dependency_graph — View full dependency tree with health status
-- trace_failure {service} — Trace upstream/downstream blast radius
+- get_dependency_graph
+- trace_failure {service}
 - restart_service {service}
 - scale_up {service}
 - rollback_deploy {service}
-- kill_process {service} — Kill a specific process by PID. Pass PID in parameters: {"pid": "1234"}
+- kill_process {service} (parameters: {"pid": "1234"})
 - check_process_list {service}
 - check_network {service}
-- add_note {text} — Save an observation to your evidence board
-- view_notes — Review your saved observations
-- get_runbook — Get the standard operating procedure for this incident type
-- submit_root_cause {description} — Put your diagnosis in the "target" field. This ENDS the episode.
+- add_note {text}
+- view_notes
+- get_runbook
+- submit_root_cause {description}
 
 RESPONSE FORMAT — respond with ONLY a JSON object, no other text:
-
-Example 1 — check logs:
 {"command": "check_logs", "target": "database-primary", "parameters": {}}
-
-Example 2 — restart a broken service:
 {"command": "restart_service", "target": "cache-redis", "parameters": {}}
-
-Example 3 — rollback a bad deploy:
-{"command": "rollback_deploy", "target": "api-gateway", "parameters": {}}
-
-Example 4 — scale up overwhelmed workers:
-{"command": "scale_up", "target": "worker-queue", "parameters": {}}
-
-Example 5 — kill a suspicious process:
-{"command": "kill_process", "target": "payment-service", "parameters": {"pid": "9821"}}
-
-Example 6 — submit root cause (AFTER fixing):
 {"command": "submit_root_cause", "target": "disk full on log-server causing write failures", "parameters": {}}
-
-Example 7 — submit security root cause:
-{"command": "submit_root_cause", "target": "crypto mining malware attack on payment-service", "parameters": {}}
 """
 
 
@@ -104,7 +84,6 @@ Example 7 — submit security root cause:
     before_sleep=lambda rs: print(f"  Rate limited. Retrying in {rs.next_action.sleep:.0f}s..."),
 )
 def call_llm(client: OpenAI, messages: list, model: str):
-    """Call the LLM with automatic retry on rate limits and transient errors."""
     response = client.chat.completions.create(
         model=model,
         messages=messages,
@@ -115,17 +94,13 @@ def call_llm(client: OpenAI, messages: list, model: str):
 
 
 def parse_action(response_text: str) -> SREAction:
-    """Parse LLM response into an SREAction."""
     text = (response_text or "").strip()
 
-    # Try to extract JSON from the response
-    # Handle cases where LLM wraps JSON in markdown code blocks
     if "```json" in text:
         text = text.split("```json")[1].split("```")[0].strip()
     elif "```" in text:
         text = text.split("```")[1].split("```")[0].strip()
 
-    # Find the first { and last }
     start = text.find("{")
     end = text.rfind("}") + 1
     if start >= 0 and end > start:
@@ -139,12 +114,10 @@ def parse_action(response_text: str) -> SREAction:
             parameters=data.get("parameters", {}),
         )
     except (json.JSONDecodeError, Exception):
-        # Fallback: try to parse as a simple command
         return SREAction(command="list_alerts", target="", parameters={})
 
 
 def run_episode(env: SREEnvironment, client: OpenAI, task_id: str, scenario_idx: int = 0) -> dict:
-    """Run a single episode with the LLM agent."""
     obs = env.reset(task_id=task_id, scenario_index=scenario_idx)
 
     messages = [
@@ -163,16 +136,13 @@ def run_episode(env: SREEnvironment, client: OpenAI, task_id: str, scenario_idx:
             print(f"  API error (after retries): {e}")
             break
 
-        # Parse action from LLM response
         action = parse_action(assistant_msg)
         steps += 1
 
         print(f"  Step {steps}: {action.command} {action.target}")
 
-        # Execute action
         obs = env.step(action)
 
-        # Add to conversation history
         messages.append({"role": "assistant", "content": assistant_msg})
         messages.append({
             "role": "user",
@@ -200,7 +170,7 @@ def main():
     args = parser.parse_args()
 
     if not API_KEY:
-        print("ERROR: Set HF_TOKEN environment variable.")
+        print("ERROR: Set HF_TOKEN or API_KEY environment variable.")
         print("  For Groq (free):  export HF_TOKEN=your-groq-key")
         print("  For NVIDIA:       export HF_TOKEN=your-nvidia-key")
         sys.exit(1)
@@ -241,7 +211,6 @@ def main():
     for task_id, data in all_results.items():
         print(f"  {task_id:8s}: {data['mean_score']:.2f} (across {data['scenarios_tested']} scenarios)")
 
-    # Save results
     with open("baseline_results.json", "w") as f:
         json.dump(all_results, f, indent=2)
     print(f"\nResults saved to baseline_results.json")

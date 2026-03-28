@@ -25,14 +25,8 @@ env = SREEnvironment()
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    """Serve the dashboard at root — no redirect flicker."""
+    """Serve the dashboard at root."""
     return DASHBOARD_HTML
-
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for container orchestration and evaluator."""
-    return {"status": "ok", "environment": "incident-response-env", "version": "1.0.0"}
 
 
 @app.get("/tasks")
@@ -94,6 +88,28 @@ async def mcp_tools():
     }
 
 
+@app.get("/env/state")
+async def get_env_state():
+    """Return detailed environment state (extends OpenEnv /state)."""
+    state = env.state
+    return {
+        "episode_id": state.episode_id,
+        "task_id": state.task_id,
+        "scenario_id": state.scenario_id,
+        "step_count": state.step_count,
+        "max_steps": state.max_steps,
+        "current_health": state.current_health,
+        "initial_health": state.initial_health,
+        "root_cause_found": state.root_cause_found,
+        "done": state.done,
+        "cumulative_reward": state.cumulative_reward,
+        "services_investigated": state.services_investigated,
+        "services_restarted": state.services_restarted,
+        "destructive_actions": state.destructive_actions,
+        "actions_taken": state.actions_taken,
+    }
+
+
 # ── Web UI API Endpoints ──────────────────────────────────────────────────
 
 
@@ -140,14 +156,6 @@ async def web_step(req: StepRequest):
     return result
 
 
-
-@app.post("/reset")
-async def api_reset(req: ResetRequest):
-    return await web_reset(req)
-
-@app.post("/step")
-async def api_step(req: StepRequest):
-    return await web_step(req)
 
 # ── Web Dashboard ─────────────────────────────────────────────────────────
 

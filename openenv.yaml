@@ -3,13 +3,14 @@ version: 1.0.0
 description: >
   On-Call SRE Simulator — A DevSecOps incident response environment where 
   an AI agent triages alerts, diagnoses root causes, and remediates failures
-  across a simulated microservices cluster. Features 3 difficulty tiers 
-  (easy/medium/hard), deterministic grading, partial reward signals, and 
-  cross-domain reasoning tasks blending reliability engineering with 
-  cybersecurity incident detection.
+  across a simulated microservices cluster. Features 4 difficulty tiers
+  (easy/medium/hard/expert), deterministic grading, partial reward signals, and
+  cross-domain reasoning tasks blending reliability engineering with
+  cybersecurity incident detection. Hybrid-real infrastructure with
+  Redis, SQLite, and real process monitoring.
 author: Mohammad Zeeshan
 author_email: zeeshanm8313@gmail.com
-license: MIT
+license: AGPL-3.0
 tags:
   - sre
   - incident-response

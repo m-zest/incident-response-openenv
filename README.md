@@ -97,6 +97,7 @@ Database split-brain during network partition (both nodes claim primary, writes 
 - **Post-mortem reports** -`GET /postmortem` returns structured incident timeline with efficiency rating
 - **Seed reproducibility** -`reset(seed=42)` produces identical episodes
 - **RL training ready** -`examples/train_with_trl.py` shows HuggingFace TRL GRPOTrainer integration
+- **Hybrid-real infrastructure** -real Redis, SQLite (10K users, 50K transactions), log files, and process monitoring. Chaos engine injects real failures (memory fills, CPU burners, connection floods). Falls back to simulated data when services unavailable.
 
 ## API Endpoints
 
@@ -108,10 +109,13 @@ Database split-brain during network partition (both nodes claim primary, writes 
 | `/baseline` | GET | AI and human baseline scores |
 | `/grader` | GET | Grading result after episode |
 | `/postmortem` | GET | Structured incident report after episode |
+| `/state` | GET | Current environment state (OpenEnv spec) |
 | `/mcp/tools` | GET | MCP tool discovery (reflects lockdown state) |
 | `/ws` | WebSocket | Standard OpenEnv agent connection |
-| `/web/reset` | POST | Start new episode |
-| `/web/step` | POST | Execute command |
+| `/reset` | POST | Start new episode (JSON body) |
+| `/step` | POST | Execute command (JSON body) |
+| `/web/reset` | POST | Start new episode (web UI) |
+| `/web/step` | POST | Execute command (web UI) |
 
 ## Running Locally
 
