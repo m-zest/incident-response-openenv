@@ -140,6 +140,15 @@ async def web_step(req: StepRequest):
     return result
 
 
+
+@app.post("/reset")
+async def api_reset(req: ResetRequest):
+    return await web_reset(req)
+
+@app.post("/step")
+async def api_step(req: StepRequest):
+    return await web_step(req)
+
 # ── Web Dashboard ─────────────────────────────────────────────────────────
 
 
