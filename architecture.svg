@@ -1,0 +1,226 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 720" font-family="'Segoe UI',system-ui,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0B0B0F"/><stop offset="100%" stop-color="#111118"/></linearGradient>
+    <linearGradient id="purple" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#6D28D9"/></linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#22D3EE"/><stop offset="100%" stop-color="#0891B2"/></linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#34D399"/><stop offset="100%" stop-color="#059669"/></linearGradient>
+    <linearGradient id="red" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#EF4444"/><stop offset="100%" stop-color="#B91C1C"/></linearGradient>
+    <linearGradient id="yellow" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FBBF24"/><stop offset="100%" stop-color="#D97706"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#4B5563"/></marker>
+    <marker id="arrowPurple" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#8B5CF6"/></marker>
+    <marker id="arrowCyan" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#22D3EE"/></marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="720" fill="url(#bg)" rx="16"/>
+
+  <!-- Title -->
+  <text x="550" y="40" text-anchor="middle" fill="#F9FAFB" font-size="22" font-weight="700" letter-spacing="-0.5">SRE Incident Response Simulator — Architecture</text>
+  <text x="550" y="62" text-anchor="middle" fill="#6B7280" font-size="12">OpenEnv-compatible RL Environment with Hybrid-Real Infrastructure</text>
+
+  <!-- ═══ ROW 1: Agent Layer ═══ -->
+  <!-- LLM Agent -->
+  <rect x="40" y="90" width="200" height="70" rx="12" fill="none" stroke="url(#purple)" stroke-width="2"/>
+  <text x="140" y="118" text-anchor="middle" fill="#8B5CF6" font-size="11" font-weight="700">LLM AGENT</text>
+  <text x="140" y="136" text-anchor="middle" fill="#9CA3AF" font-size="10">Nemotron 3 Super 120B</text>
+  <text x="140" y="150" text-anchor="middle" fill="#6B7280" font-size="9">or any OpenAI-compatible</text>
+
+  <!-- Human Player -->
+  <rect x="280" y="90" width="200" height="70" rx="12" fill="none" stroke="url(#cyan)" stroke-width="2"/>
+  <text x="380" y="118" text-anchor="middle" fill="#22D3EE" font-size="11" font-weight="700">HUMAN SRE</text>
+  <text x="380" y="136" text-anchor="middle" fill="#9CA3AF" font-size="10">Interactive Dashboard</text>
+  <text x="380" y="150" text-anchor="middle" fill="#6B7280" font-size="9">Mode: Simulated | Hybrid-Real</text>
+
+  <!-- Evaluator Bot -->
+  <rect x="520" y="90" width="200" height="70" rx="12" fill="none" stroke="url(#yellow)" stroke-width="2"/>
+  <text x="620" y="118" text-anchor="middle" fill="#FBBF24" font-size="11" font-weight="700">EVALUATOR</text>
+  <text x="620" y="136" text-anchor="middle" fill="#9CA3AF" font-size="10">Automated Bot + Human Review</text>
+  <text x="620" y="150" text-anchor="middle" fill="#6B7280" font-size="9">openenv validate + inference.py</text>
+
+  <!-- Arrows from agents to API -->
+  <line x1="140" y1="160" x2="140" y2="195" stroke="#4B5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="380" y1="160" x2="380" y2="195" stroke="#4B5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="620" y1="160" x2="550" y2="195" stroke="#4B5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ═══ ROW 2: API Layer ═══ -->
+  <rect x="40" y="200" width="680" height="65" rx="12" fill="rgba(139,92,246,0.08)" stroke="rgba(139,92,246,0.25)" stroke-width="1"/>
+  <text x="60" y="222" fill="#8B5CF6" font-size="11" font-weight="700">FASTAPI SERVER</text>
+  <text x="60" y="240" fill="#6B7280" font-size="9">Port 7860</text>
+
+  <!-- Endpoints -->
+  <rect x="180" y="210" width="80" height="24" rx="6" fill="rgba(139,92,246,0.15)"/>
+  <text x="220" y="226" text-anchor="middle" fill="#A78BFA" font-size="9" font-weight="600">POST /reset</text>
+  <rect x="270" y="210" width="80" height="24" rx="6" fill="rgba(139,92,246,0.15)"/>
+  <text x="310" y="226" text-anchor="middle" fill="#A78BFA" font-size="9" font-weight="600">POST /step</text>
+  <rect x="360" y="210" width="80" height="24" rx="6" fill="rgba(139,92,246,0.15)"/>
+  <text x="400" y="226" text-anchor="middle" fill="#A78BFA" font-size="9" font-weight="600">GET /state</text>
+  <rect x="450" y="210" width="80" height="24" rx="6" fill="rgba(139,92,246,0.15)"/>
+  <text x="490" y="226" text-anchor="middle" fill="#A78BFA" font-size="9" font-weight="600">GET /health</text>
+  <rect x="540" y="210" width="90" height="24" rx="6" fill="rgba(139,92,246,0.15)"/>
+  <text x="585" y="226" text-anchor="middle" fill="#A78BFA" font-size="9" font-weight="600">GET /baseline</text>
+  <rect x="640" y="210" width="70" height="24" rx="6" fill="rgba(34,211,238,0.15)"/>
+  <text x="675" y="226" text-anchor="middle" fill="#22D3EE" font-size="9" font-weight="600">Dashboard</text>
+
+  <rect x="180" y="240" width="100" height="20" rx="6" fill="rgba(139,92,246,0.08)"/>
+  <text x="230" y="254" text-anchor="middle" fill="#6B7280" font-size="8">POST /web/reset</text>
+  <rect x="290" y="240" width="100" height="20" rx="6" fill="rgba(139,92,246,0.08)"/>
+  <text x="340" y="254" text-anchor="middle" fill="#6B7280" font-size="8">POST /web/step</text>
+  <rect x="400" y="240" width="100" height="20" rx="6" fill="rgba(139,92,246,0.08)"/>
+  <text x="450" y="254" text-anchor="middle" fill="#6B7280" font-size="8">GET /mcp/tools</text>
+  <rect x="510" y="240" width="100" height="20" rx="6" fill="rgba(139,92,246,0.08)"/>
+  <text x="560" y="254" text-anchor="middle" fill="#6B7280" font-size="8">GET /postmortem</text>
+
+  <!-- Arrow to Environment -->
+  <line x1="380" y1="265" x2="380" y2="295" stroke="#8B5CF6" stroke-width="2" marker-end="url(#arrowPurple)"/>
+
+  <!-- ═══ ROW 3: Environment Core ═══ -->
+  <rect x="40" y="300" width="680" height="100" rx="12" fill="rgba(52,211,153,0.06)" stroke="rgba(52,211,153,0.2)" stroke-width="1"/>
+  <text x="60" y="322" fill="#34D399" font-size="11" font-weight="700">ENVIRONMENT CORE</text>
+
+  <!-- Sub-modules -->
+  <rect x="60" y="335" width="130" height="50" rx="8" fill="rgba(52,211,153,0.1)" stroke="rgba(52,211,153,0.15)" stroke-width="1"/>
+  <text x="125" y="355" text-anchor="middle" fill="#34D399" font-size="10" font-weight="600">environment.py</text>
+  <text x="125" y="370" text-anchor="middle" fill="#6B7280" font-size="8">reset() / step() / state()</text>
+
+  <rect x="200" y="335" width="150" height="50" rx="8" fill="rgba(52,211,153,0.1)" stroke="rgba(52,211,153,0.15)" stroke-width="1"/>
+  <text x="275" y="355" text-anchor="middle" fill="#34D399" font-size="10" font-weight="600">infrastructure.py</text>
+  <text x="275" y="370" text-anchor="middle" fill="#6B7280" font-size="8">SimulatedCluster + 17 cmds</text>
+
+  <rect x="360" y="335" width="110" height="50" rx="8" fill="rgba(52,211,153,0.1)" stroke="rgba(52,211,153,0.15)" stroke-width="1"/>
+  <text x="415" y="355" text-anchor="middle" fill="#34D399" font-size="10" font-weight="600">grader.py</text>
+  <text x="415" y="370" text-anchor="middle" fill="#6B7280" font-size="8">Deterministic scoring</text>
+
+  <rect x="480" y="335" width="110" height="50" rx="8" fill="rgba(52,211,153,0.1)" stroke="rgba(52,211,153,0.15)" stroke-width="1"/>
+  <text x="535" y="355" text-anchor="middle" fill="#34D399" font-size="10" font-weight="600">models.py</text>
+  <text x="535" y="370" text-anchor="middle" fill="#6B7280" font-size="8">Pydantic Action/Obs/State</text>
+
+  <rect x="600" y="335" width="110" height="50" rx="8" fill="rgba(52,211,153,0.1)" stroke="rgba(52,211,153,0.15)" stroke-width="1"/>
+  <text x="655" y="355" text-anchor="middle" fill="#34D399" font-size="10" font-weight="600">scenarios/*.json</text>
+  <text x="655" y="370" text-anchor="middle" fill="#6B7280" font-size="8">14 scenarios × 4 tiers</text>
+
+  <!-- ═══ ROW 4: Two-track infrastructure ═══ -->
+  <!-- Simulated track -->
+  <rect x="40" y="430" width="330" height="180" rx="12" fill="rgba(251,191,36,0.05)" stroke="rgba(251,191,36,0.2)" stroke-width="1"/>
+  <text x="60" y="452" fill="#FBBF24" font-size="11" font-weight="700">SIMULATED MODE</text>
+  <text x="60" y="468" fill="#6B7280" font-size="9">Always available — works without Docker</text>
+
+  <rect x="55" y="480" width="140" height="35" rx="6" fill="rgba(251,191,36,0.08)"/>
+  <text x="125" y="495" text-anchor="middle" fill="#FBBF24" font-size="9" font-weight="600">Template Logs</text>
+  <text x="125" y="508" text-anchor="middle" fill="#6B7280" font-size="8">Scenario JSON pre-built</text>
+
+  <rect x="205" y="480" width="155" height="35" rx="6" fill="rgba(251,191,36,0.08)"/>
+  <text x="282" y="495" text-anchor="middle" fill="#FBBF24" font-size="9" font-weight="600">Hardcoded Metrics</text>
+  <text x="282" y="508" text-anchor="middle" fill="#6B7280" font-size="8">CPU/Mem/Disk from scenario</text>
+
+  <rect x="55" y="525" width="140" height="35" rx="6" fill="rgba(251,191,36,0.08)"/>
+  <text x="125" y="540" text-anchor="middle" fill="#FBBF24" font-size="9" font-weight="600">Fake Process List</text>
+  <text x="125" y="553" text-anchor="middle" fill="#6B7280" font-size="8">Scenario-defined PIDs</text>
+
+  <rect x="205" y="525" width="155" height="35" rx="6" fill="rgba(251,191,36,0.08)"/>
+  <text x="282" y="540" text-anchor="middle" fill="#FBBF24" font-size="9" font-weight="600">NetworkX Graph</text>
+  <text x="282" y="553" text-anchor="middle" fill="#6B7280" font-size="8">Dependency + PageRank</text>
+
+  <rect x="55" y="570" width="300" height="25" rx="6" fill="rgba(251,191,36,0.05)"/>
+  <text x="205" y="587" text-anchor="middle" fill="#9CA3AF" font-size="9">Used by: inference.py (local), fallback in Docker</text>
+
+  <!-- Hybrid-Real track -->
+  <rect x="390" y="430" width="330" height="180" rx="12" fill="rgba(34,211,238,0.05)" stroke="rgba(34,211,238,0.2)" stroke-width="1"/>
+  <text x="410" y="452" fill="#22D3EE" font-size="11" font-weight="700">HYBRID-REAL MODE</text>
+  <circle cx="560" cy="447" r="5" fill="#34D399"/>
+  <text x="570" y="452" fill="#34D399" font-size="9" font-weight="600">ACTIVE</text>
+  <text x="410" y="468" fill="#6B7280" font-size="9">Docker only — real services + chaos injection</text>
+
+  <rect x="405" y="480" width="145" height="35" rx="6" fill="rgba(34,211,238,0.08)"/>
+  <text x="477" y="495" text-anchor="middle" fill="#22D3EE" font-size="9" font-weight="600">Redis 7.0</text>
+  <text x="477" y="508" text-anchor="middle" fill="#6B7280" font-size="8">50MB, real INFO/metrics</text>
+
+  <rect x="560" y="480" width="145" height="35" rx="6" fill="rgba(34,211,238,0.08)"/>
+  <text x="632" y="495" text-anchor="middle" fill="#22D3EE" font-size="9" font-weight="600">SQLite DB</text>
+  <text x="632" y="508" text-anchor="middle" fill="#6B7280" font-size="8">10K users, 50K txns</text>
+
+  <rect x="405" y="525" width="145" height="35" rx="6" fill="rgba(34,211,238,0.08)"/>
+  <text x="477" y="540" text-anchor="middle" fill="#22D3EE" font-size="9" font-weight="600">Live Log Writer</text>
+  <text x="477" y="553" text-anchor="middle" fill="#6B7280" font-size="8">fake_worker.py → /tmp/</text>
+
+  <rect x="560" y="525" width="145" height="35" rx="6" fill="rgba(34,211,238,0.08)"/>
+  <text x="632" y="540" text-anchor="middle" fill="#22D3EE" font-size="9" font-weight="600">psutil Processes</text>
+  <text x="632" y="553" text-anchor="middle" fill="#6B7280" font-size="8">Real PID/CPU/RAM</text>
+
+  <rect x="405" y="570" width="300" height="25" rx="6" fill="rgba(34,211,238,0.05)"/>
+  <text x="555" y="587" text-anchor="middle" fill="#9CA3AF" font-size="9">Used by: HF Space, Docker, evaluator dashboard review</text>
+
+  <!-- Arrows from env to both tracks -->
+  <line x1="275" y1="400" x2="205" y2="425" stroke="#FBBF24" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+  <line x1="275" y1="400" x2="555" y2="425" stroke="#22D3EE" stroke-width="1.5" marker-end="url(#arrowCyan)"/>
+
+  <!-- ═══ RIGHT SIDE: Chaos Engine ═══ -->
+  <rect x="760" y="90" width="310" height="310" rx="12" fill="rgba(239,68,68,0.05)" stroke="rgba(239,68,68,0.2)" stroke-width="1"/>
+  <text x="780" y="115" fill="#EF4444" font-size="11" font-weight="700">CHAOS ENGINE</text>
+  <text x="780" y="132" fill="#6B7280" font-size="9">Real failure injection per scenario</text>
+
+  <rect x="775" y="145" width="280" height="28" rx="6" fill="rgba(52,211,153,0.08)"/>
+  <text x="785" y="164" fill="#34D399" font-size="9" font-weight="600">EASY</text>
+  <text x="830" y="164" fill="#9CA3AF" font-size="9">disk fill • Redis leak • process kill</text>
+
+  <rect x="775" y="180" width="280" height="28" rx="6" fill="rgba(251,191,36,0.08)"/>
+  <text x="785" y="199" fill="#FBBF24" font-size="9" font-weight="600">MEDIUM</text>
+  <text x="848" y="199" fill="#9CA3AF" font-size="9">Redis flood • DB lock • queue backlog</text>
+
+  <rect x="775" y="215" width="280" height="28" rx="6" fill="rgba(239,68,68,0.08)"/>
+  <text x="785" y="234" fill="#EF4444" font-size="9" font-weight="600">HARD</text>
+  <text x="830" y="234" fill="#9CA3AF" font-size="9">CPU burner (crypto miner)</text>
+
+  <rect x="775" y="250" width="280" height="28" rx="6" fill="rgba(167,139,250,0.08)"/>
+  <text x="785" y="269" fill="#A78BFA" font-size="9" font-weight="600">EXPERT</text>
+  <text x="843" y="269" fill="#9CA3AF" font-size="9">divergent replica DB (split-brain)</text>
+
+  <line x1="780" y1="290" x2="1050" y2="290" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+  <text x="780" y="310" fill="#6B7280" font-size="9">Lifecycle:</text>
+  <text x="780" y="328" fill="#9CA3AF" font-size="9">1. reset() → inject(scenario_id)</text>
+  <text x="780" y="346" fill="#9CA3AF" font-size="9">2. Agent investigates real failures</text>
+  <text x="780" y="364" fill="#9CA3AF" font-size="9">3. Episode ends → cleanup()</text>
+  <text x="780" y="382" fill="#9CA3AF" font-size="9">4. Next reset → clean slate</text>
+
+  <!-- ═══ RIGHT SIDE: Grading ═══ -->
+  <rect x="760" y="420" width="310" height="190" rx="12" fill="rgba(139,92,246,0.05)" stroke="rgba(139,92,246,0.2)" stroke-width="1"/>
+  <text x="780" y="445" fill="#8B5CF6" font-size="11" font-weight="700">DETERMINISTIC GRADER</text>
+  <text x="780" y="462" fill="#6B7280" font-size="9">Same formula, both modes — text doesn't affect score</text>
+
+  <text x="785" y="485" fill="#9CA3AF" font-size="9">Tracks internally (not from text output):</text>
+  <text x="800" y="503" fill="#34D399" font-size="9">✓ services_investigated[]</text>
+  <text x="800" y="519" fill="#34D399" font-size="9">✓ root_cause_found (boolean)</text>
+  <text x="800" y="535" fill="#34D399" font-size="9">✓ correct_fix_applied (boolean)</text>
+  <text x="800" y="551" fill="#34D399" font-size="9">✓ step_count vs optimal_steps</text>
+  <text x="800" y="567" fill="#34D399" font-size="9">✓ health_initial → health_final</text>
+  <text x="800" y="583" fill="#34D399" font-size="9">✓ destructive_actions count</text>
+
+  <text x="785" y="600" fill="#A78BFA" font-size="9" font-weight="600">S = max(0, ΔHealth × ω − φ − ψ)</text>
+
+  <!-- ═══ BOTTOM: Scores ═══ -->
+  <rect x="40" y="640" width="1030" height="60" rx="12" fill="rgba(139,92,246,0.04)" stroke="rgba(139,92,246,0.12)" stroke-width="1"/>
+  <text x="60" y="662" fill="#8B5CF6" font-size="11" font-weight="700">BASELINE SCORES</text>
+  <text x="60" y="680" fill="#6B7280" font-size="9">nvidia/nemotron-3-super-120b-a12b</text>
+
+  <rect x="300" y="650" width="90" height="38" rx="8" fill="rgba(52,211,153,0.1)"/>
+  <text x="345" y="665" text-anchor="middle" fill="#34D399" font-size="10" font-weight="700">Easy</text>
+  <text x="345" y="681" text-anchor="middle" fill="#34D399" font-size="14" font-weight="700">0.80</text>
+
+  <rect x="400" y="650" width="90" height="38" rx="8" fill="rgba(251,191,36,0.1)"/>
+  <text x="445" y="665" text-anchor="middle" fill="#FBBF24" font-size="10" font-weight="700">Medium</text>
+  <text x="445" y="681" text-anchor="middle" fill="#FBBF24" font-size="14" font-weight="700">0.57</text>
+
+  <rect x="500" y="650" width="90" height="38" rx="8" fill="rgba(239,68,68,0.1)"/>
+  <text x="545" y="665" text-anchor="middle" fill="#EF4444" font-size="10" font-weight="700">Hard</text>
+  <text x="545" y="681" text-anchor="middle" fill="#EF4444" font-size="14" font-weight="700">0.28</text>
+
+  <rect x="600" y="650" width="90" height="38" rx="8" fill="rgba(167,139,250,0.1)"/>
+  <text x="645" y="665" text-anchor="middle" fill="#A78BFA" font-size="10" font-weight="700">Expert</text>
+  <text x="645" y="681" text-anchor="middle" fill="#A78BFA" font-size="14" font-weight="700">0.09</text>
+
+  <text x="750" y="665" fill="#6B7280" font-size="9">Human SRE:</text>
+  <text x="750" y="681" fill="#9CA3AF" font-size="9">0.90 / 0.80 / 0.70 / 0.74</text>
+
+  <text x="920" y="665" fill="#6B7280" font-size="9">14 scenarios</text>
+  <text x="920" y="681" fill="#9CA3AF" font-size="9">40 tests passing</text>
+</svg>

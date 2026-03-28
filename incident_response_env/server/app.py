@@ -53,10 +53,10 @@ async def get_baseline():
     return {
         "model": "nvidia/nemotron-3-super-120b-a12b",
         "scores": {
-            "easy": {"ai": 0.77, "human": 0.90, "scenarios": 5},
-            "medium": {"ai": 0.46, "human": 0.80, "scenarios": 4},
-            "hard": {"ai": 0.26, "human": 0.70, "scenarios": 3},
-            "expert": {"ai": 0.00, "human": 0.74, "scenarios": 2},
+            "easy": {"ai": 0.80, "human": 0.90, "scenarios": 5},
+            "medium": {"ai": 0.57, "human": 0.80, "scenarios": 4},
+            "hard": {"ai": 0.28, "human": 0.70, "scenarios": 3},
+            "expert": {"ai": 0.09, "human": 0.74, "scenarios": 2},
         },
         "total_scenarios": 14,
         "note": "Expert tier is fully solvable by humans (0.74 in 9 steps) but defeats the 120B parameter model, demonstrating significant RL training potential.",
