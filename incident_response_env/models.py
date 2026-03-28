@@ -56,6 +56,9 @@ class SREObservation(BaseModel):
     )
     step_count: int = Field(description="How many steps the agent has taken.")
     max_steps: int = Field(description="Maximum allowed steps for this task.")
+    reward: float = Field(
+        default=0.0, description="Step reward signal for RL training."
+    )
     done: bool = Field(
         default=False, description="Whether the episode has ended."
     )
