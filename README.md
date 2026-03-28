@@ -171,7 +171,3 @@ incident-response-openenv/
 ## Author
 
 **Mohammad Zeeshan**
-
-## License
-
-MIT
