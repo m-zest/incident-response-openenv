@@ -3,7 +3,7 @@ name = "incident-response-env"
 version = "1.0.0"
 description = "On-Call SRE Simulator — DevSecOps incident response environment for OpenEnv"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "AGPL-3.0"
 authors = [
     {name = "Mohammad Zeeshan", email = "zeeshanm8313@gmail.com"}
 ]
