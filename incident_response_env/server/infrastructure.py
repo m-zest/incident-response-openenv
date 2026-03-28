@@ -2,7 +2,9 @@
 Simulated infrastructure engine for the SRE environment.
 
 Loads scenarios from JSON, manages service states, and processes
-agent commands against the simulated cluster.
+agent commands against the simulated cluster. When Redis and SQLite
+are available, enriches observations with real metrics from the
+hybrid-real infrastructure layer.
 """
 
 import json
@@ -12,6 +14,10 @@ import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 import networkx as nx
 
@@ -25,6 +31,34 @@ def load_scenarios(difficulty: str) -> list[dict]:
         raise FileNotFoundError(f"Scenario file not found: {path}")
     with open(path) as f:
         return json.load(f)
+
+
+# ── Hybrid infrastructure singleton ───────────────────────────────────────
+
+_hybrid_cache = {"checked": False, "metrics": None, "chaos": None}
+
+
+def _get_hybrid_services():
+    """Return cached (RealMetrics, ChaosEngine) or (None, None) if unavailable."""
+    if _hybrid_cache["checked"]:
+        return _hybrid_cache["metrics"], _hybrid_cache["chaos"]
+
+    _hybrid_cache["checked"] = True
+    try:
+        from ..services.real_metrics import RealMetrics
+        from ..services.chaos_engine import ChaosEngine
+
+        metrics = RealMetrics()
+        chaos = ChaosEngine()
+
+        if metrics.redis_available or metrics.sqlite_available:
+            _hybrid_cache["metrics"] = metrics
+            _hybrid_cache["chaos"] = chaos
+            return metrics, chaos
+    except Exception:
+        pass
+
+    return None, None
 
 
 # ── Dynamic Log Generator ─────────────────────────────────────────────────
@@ -70,9 +104,11 @@ class LogGenerator:
 
 class SimulatedCluster:
     """
-    A text-based simulation of a microservices cluster.
-    All data is fake — Python dicts and strings.
-    No real servers, no real infrastructure.
+    Simulated microservices cluster with optional hybrid-real infrastructure.
+
+    When Redis and SQLite are available, enriches observations with real
+    metrics and injects real chaos failures. Falls back to simulated data
+    when services are unavailable.
     """
 
     def __init__(self, scenario: dict, seed: int = None):
@@ -158,6 +194,28 @@ class SimulatedCluster:
         for svc, deps in self.dependencies.items():
             for dep in deps:
                 self._dep_graph.add_edge(svc, dep)  # svc depends on dep
+
+        # Hybrid-real infrastructure (optional, cached singleton)
+        self._real_metrics = None
+        self._chaos_engine = None
+        self._hybrid_mode = False
+        try:
+            metrics, chaos = _get_hybrid_services()
+            if metrics is not None:
+                self._real_metrics = metrics
+                self._chaos_engine = chaos
+                self._hybrid_mode = True
+                chaos.inject(self.scenario_id)
+                logger.info(
+                    "Hybrid mode active: redis=%s sqlite=%s scenario=%s",
+                    metrics.redis_available, metrics.sqlite_available, self.scenario_id,
+                )
+        except Exception as e:
+            logger.debug("Hybrid infrastructure not available: %s", e)
+
+    def cleanup_chaos(self):
+        if self._chaos_engine:
+            self._chaos_engine.cleanup()
 
     def get_active_alerts(self) -> list[dict]:
         """Return currently firing alerts."""
@@ -261,8 +319,19 @@ class SimulatedCluster:
         if service == self.root_cause_service:
             self.correct_investigations.append(service)
         lines = parameters.get("lines", 50)
-        logs = self.services[service]["logs"][-lines:]
-        return f"=== Logs for {service} (last {len(logs)} lines) ===\n" + "\n".join(logs)
+
+        # Try real logs first, fall back to simulated
+        real_logs = None
+        if self._real_metrics:
+            real_logs = self._real_metrics.get_log_tail(service, lines)
+
+        sim_logs = self.services[service]["logs"][-lines:]
+        output = f"=== Logs for {service} (last {len(sim_logs)} lines) ===\n" + "\n".join(sim_logs)
+
+        if real_logs:
+            output += f"\n\n--- Live service logs ---\n{real_logs}"
+
+        return output
 
     def _get_metrics(self, service: str) -> str:
         if service not in self.services:
@@ -271,7 +340,7 @@ class SimulatedCluster:
         if service == self.root_cause_service:
             self.correct_investigations.append(service)
         m = self.services[service]["metrics"]
-        return (
+        output = (
             f"=== Metrics for {service} ===\n"
             f"  CPU:         {m['cpu']}%\n"
             f"  Memory:      {m['memory']}%\n"
@@ -279,6 +348,40 @@ class SimulatedCluster:
             f"  Latency:     {m['latency_ms']}ms\n"
             f"  Connections: {m['connections']}/{m['max_connections']}"
         )
+
+        if self._real_metrics:
+            redis_metrics = self._real_metrics.get_redis_metrics()
+            if redis_metrics and service in ("cache-redis", "payment-service", "worker-queue"):
+                output += (
+                    f"\n\n--- Redis (live) ---\n"
+                    f"  Memory:      {redis_metrics['used_memory_mb']:.1f}MB / {redis_metrics['maxmemory_mb']:.1f}MB\n"
+                    f"  Clients:     {redis_metrics['connected_clients']}\n"
+                    f"  Keys:        {redis_metrics['total_keys']}\n"
+                    f"  Evictions:   {redis_metrics['evicted_keys']}\n"
+                    f"  Hit ratio:   {redis_metrics['keyspace_hits']}/{redis_metrics['keyspace_hits'] + redis_metrics['keyspace_misses']}"
+                )
+
+            sqlite_metrics = self._real_metrics.get_sqlite_metrics()
+            if sqlite_metrics and service in ("database-primary", "user-service", "api-gateway"):
+                output += (
+                    f"\n\n--- Database (live) ---\n"
+                    f"  Users:       {sqlite_metrics['total_users']:,}\n"
+                    f"  Transactions:{sqlite_metrics['total_transactions']:,}\n"
+                    f"  Sessions:    {sqlite_metrics['active_sessions']:,} active\n"
+                    f"  Errors (5xx):{sqlite_metrics['error_count_5xx']:,}\n"
+                    f"  Avg latency: {sqlite_metrics['avg_response_ms']:.0f}ms\n"
+                    f"  DB size:     {sqlite_metrics['db_size_mb']:.1f}MB"
+                )
+
+            disk = self._real_metrics.get_disk_usage()
+            if disk and "disk" in self.root_cause.lower():
+                output += (
+                    f"\n\n--- Disk (live) ---\n"
+                    f"  Total: {disk['total_gb']:.1f}GB  Used: {disk['used_gb']:.1f}GB  "
+                    f"Free: {disk['free_gb']:.1f}GB ({disk['used_pct']:.0f}%)"
+                )
+
+        return output
 
     def _list_alerts(self) -> str:
         if not self.alerts:
@@ -309,7 +412,15 @@ class SimulatedCluster:
         procs = self.services[service].get("processes", [])
         if not procs:
             return f"=== Process List for {service} ===\n  No processes running (service may be down)."
-        return f"=== Process List for {service} ===\n" + "\n".join(f"  {p}" for p in procs)
+        output = f"=== Process List for {service} ===\n" + "\n".join(f"  {p}" for p in procs)
+
+        if self._real_metrics:
+            real_procs = self._real_metrics.get_process_list()
+            if real_procs:
+                output += f"\n\n--- Host processes (live, top 15) ---\n"
+                output += "\n".join(f"  {p}" for p in real_procs[:15])
+
+        return output
 
     def _check_network(self, service: str) -> str:
         if service not in self.services:

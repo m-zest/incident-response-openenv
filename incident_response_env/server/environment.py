@@ -76,6 +76,10 @@ class SREEnvironment(Environment):
             scenario_index: Specific scenario index, or -1 for random
             seed: Optional seed for reproducibility. None = random seed.
         """
+        # Clean up previous chaos injections
+        if self._cluster is not None:
+            self._cluster.cleanup_chaos()
+
         if task_id not in self._scenarios:
             task_id = "easy"
 
