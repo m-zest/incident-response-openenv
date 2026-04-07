@@ -128,5 +128,5 @@ def compute_final_score(
     psi = destructive_actions * 0.15
 
     # Final score
-    score = max(0.0, health_ratio * omega - phi - psi)
-    return min(1.0, score)
+    score = max(0.01, health_ratio * omega - phi - psi)
+    return min(0.99, score)
