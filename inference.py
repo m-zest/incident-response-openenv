@@ -158,7 +158,8 @@ def run_episode(env, client, task_id, scenario_idx=0):
 
     root_cause_found = env.state.root_cause_found
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(root_cause_found).lower()} steps={steps} score={obs.score:.2f} rewards={rewards_str}", flush=True)
+    final_score = max(0.01, min(0.99, obs.score))
+    print(f"[END] success={str(root_cause_found).lower()} steps={steps} score={final_score:.2f} rewards={rewards_str}", flush=True)
 
     return {
         "task_id": task_id,
