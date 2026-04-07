@@ -51,8 +51,8 @@ echo -n "Grader: "
 curl -s https://m-zest-incident-response-env-sre.hf.space/grader | python3 -c "import sys,json; print('OK' if json.load(sys.stdin) else 'FAIL')" 2>/dev/null || echo "FAIL"
 
 # 12. No stale files
-echo -n "No stale server/: "
-[ ! -d "server" ] && echo "OK" || echo "FAIL - delete server/"
+echo -n "Server entry point: "
+[ -f "server/app.py" ] && echo "OK" || echo "FAIL - delete server/"
 
 echo -n "No baseline.py: "
 [ ! -f "baseline.py" ] && echo "OK" || echo "FAIL - delete baseline.py"
