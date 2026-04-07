@@ -140,6 +140,7 @@ def run_episode(env: SREEnvironment, client: OpenAI, task_id: str, scenario_idx:
         steps += 1
 
         print(f"  Step {steps}: {action.command} {action.target}")
+        print(f"[STEP] step={steps} reward={getattr(obs, 'reward', 0.0)}", flush=True)
 
         obs = env.step(action)
 
@@ -194,10 +195,12 @@ def main():
         print(f"--- Task: {task_id.upper()} ({len(scenarios)} scenarios) ---")
         for i, scenario in enumerate(scenarios):
             print(f"\n  Scenario {i+1}/{len(scenarios)}: {scenario['name']}")
+            print(f"[START] task={task_id}", flush=True)
             result = run_episode(env, client, task_id, i)
             task_scores.append(result["score"])
             print(f"  Result: score={result['score']:.2f}, steps={result['steps']}, "
                   f"root_cause={result['root_cause_found']}, health={result['health_final']:.0f}%")
+            print(f"[END] task={task_id} score={result['score']:.2f} steps={result['steps']}", flush=True)
 
         avg = sum(task_scores) / len(task_scores) if task_scores else 0
         all_results[task_id] = {
