@@ -170,6 +170,7 @@ class SREEnvironment(Environment):
                 max_steps=self._state.max_steps,
                 done=True,
                 score=self._state.cumulative_reward,
+            reward=step_reward,
             )
 
         # Increment step
@@ -292,6 +293,7 @@ class SREEnvironment(Environment):
             max_steps=self._state.max_steps,
             done=self._state.done,
             score=self._state.cumulative_reward,
+            reward=step_reward,
         )
 
     @property
