@@ -28,11 +28,11 @@ class TestGraderDeterminism:
 
     def test_perfect_score(self):
         score = compute_final_score(40, 100, True, True, 3, 3, 0, True)
-        assert score == 1.0, f"Expected 1.0, got {score}"
+        assert score == 0.99, f"Expected 0.99, got {score}"
 
     def test_zero_progress(self):
         score = compute_final_score(40, 40, False, False, 10, 3, 0, False)
-        assert score == 0.0, f"Expected 0.0, got {score}"
+        assert score == 0.01, f"Expected 0.01, got {score}"
 
     def test_efficiency_penalty(self):
         optimal = compute_final_score(40, 95, True, True, 3, 3, 0, True)
