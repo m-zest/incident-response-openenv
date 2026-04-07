@@ -5,15 +5,13 @@ Baseline inference script for the Incident Response SRE Environment.
 Connects an LLM (via OpenAI-compatible API) to the environment and
 runs it through all 4 task tiers, reporting scores.
 
+STDOUT FORMAT (required by OpenEnv validator):
+    [START] task=<name> env=incident-response-env model=<model>
+    [STEP] step=<n> action=<action_str> reward=<0.00> done=<true|false> error=null
+    [END] success=<true|false> steps=<n> score=<0.00> rewards=<r1,r2,...>
+
 Usage:
-    # With Groq (free, Llama 3.3 70B):
-    HF_TOKEN=your-groq-key python inference.py
-
-    # With NVIDIA Nemotron (free tier):
-    HF_TOKEN=your-nvidia-key API_BASE_URL=https://integrate.api.nvidia.com/v1 python inference.py
-
-    # With OpenAI:
-    API_KEY=your-key API_BASE_URL=https://api.openai.com/v1 MODEL_NAME=gpt-4o python inference.py
+    HF_TOKEN=your-key API_BASE_URL=https://integrate.api.nvidia.com/v1 python inference.py
 """
 
 import argparse
@@ -83,7 +81,7 @@ RESPONSE FORMAT — respond with ONLY a JSON object, no other text:
     retry=retry_if_exception_type((RateLimitError, APITimeoutError, APIConnectionError)),
     before_sleep=lambda rs: print(f"  Rate limited. Retrying in {rs.next_action.sleep:.0f}s..."),
 )
-def call_llm(client: OpenAI, messages: list, model: str):
+def call_llm(client, messages, model):
     response = client.chat.completions.create(
         model=model,
         messages=messages,
@@ -93,19 +91,16 @@ def call_llm(client: OpenAI, messages: list, model: str):
     return response
 
 
-def parse_action(response_text: str) -> SREAction:
+def parse_action(response_text):
     text = (response_text or "").strip()
-
     if "```json" in text:
         text = text.split("```json")[1].split("```")[0].strip()
     elif "```" in text:
         text = text.split("```")[1].split("```")[0].strip()
-
     start = text.find("{")
     end = text.rfind("}") + 1
     if start >= 0 and end > start:
         text = text[start:end]
-
     try:
         data = json.loads(text)
         return SREAction(
@@ -117,8 +112,10 @@ def parse_action(response_text: str) -> SREAction:
         return SREAction(command="list_alerts", target="", parameters={})
 
 
-def run_episode(env: SREEnvironment, client: OpenAI, task_id: str, scenario_idx: int = 0) -> dict:
+def run_episode(env, client, task_id, scenario_idx=0):
     obs = env.reset(task_id=task_id, scenario_index=scenario_idx)
+
+    print(f"[START] task={task_id} env=incident-response-env model={MODEL}", flush=True)
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -128,6 +125,8 @@ def run_episode(env: SREEnvironment, client: OpenAI, task_id: str, scenario_idx:
     ]
 
     steps = 0
+    rewards = []
+
     while not obs.done and steps < obs.max_steps:
         try:
             response = call_llm(client, messages, MODEL)
@@ -139,10 +138,14 @@ def run_episode(env: SREEnvironment, client: OpenAI, task_id: str, scenario_idx:
         action = parse_action(assistant_msg)
         steps += 1
 
-        print(f"  Step {steps}: {action.command} {action.target}")
-        print(f"[STEP] step={steps} reward={getattr(obs, 'reward', 0.0)}", flush=True)
-
         obs = env.step(action)
+
+        step_reward = getattr(obs, 'reward', 0.0)
+        rewards.append(step_reward)
+
+        action_str = f"{action.command} {action.target}".strip()
+        print(f"  Step {steps}: {action_str}")
+        print(f"[STEP] step={steps} action={action_str} reward={step_reward:.2f} done={str(obs.done).lower()} error=null", flush=True)
 
         messages.append({"role": "assistant", "content": assistant_msg})
         messages.append({
@@ -153,13 +156,18 @@ def run_episode(env: SREEnvironment, client: OpenAI, task_id: str, scenario_idx:
                        + ("\n\nEpisode complete." if obs.done else "\n\nWhat is your next action?")
         })
 
+    root_cause_found = env.state.root_cause_found
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(f"[END] success={str(root_cause_found).lower()} steps={steps} score={obs.score:.2f} rewards={rewards_str}", flush=True)
+
     return {
         "task_id": task_id,
         "scenario_id": env.state.scenario_id,
         "score": obs.score,
         "steps": steps,
-        "root_cause_found": env.state.root_cause_found,
+        "root_cause_found": root_cause_found,
         "health_final": obs.system_health,
+        "rewards": rewards,
     }
 
 
@@ -195,12 +203,10 @@ def main():
         print(f"--- Task: {task_id.upper()} ({len(scenarios)} scenarios) ---")
         for i, scenario in enumerate(scenarios):
             print(f"\n  Scenario {i+1}/{len(scenarios)}: {scenario['name']}")
-            print(f"[START] task={task_id}", flush=True)
             result = run_episode(env, client, task_id, i)
             task_scores.append(result["score"])
             print(f"  Result: score={result['score']:.2f}, steps={result['steps']}, "
                   f"root_cause={result['root_cause_found']}, health={result['health_final']:.0f}%")
-            print(f"[END] task={task_id} score={result['score']:.2f} steps={result['steps']}", flush=True)
 
         avg = sum(task_scores) / len(task_scores) if task_scores else 0
         all_results[task_id] = {
