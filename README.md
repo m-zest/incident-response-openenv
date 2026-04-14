@@ -21,6 +21,10 @@ Real Redis · Real SQLite · Real chaos injection · Deterministic grading
 [![Tests](https://img.shields.io/badge/Tests-40%2F40%20passing-brightgreen)]()
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue)](LICENSE)
 
+
+🏆 **Selected for Grand Finale (Top teams out of 52,000+ developers) - Meta PyTorch OpenEnv Hackathon x Scaler School of Technology | 48-hour on-campus build with Meta engineer mentorship & interview opportunity at Meta and Hugging Face AI teams | Bangalore, April 25–26, 2026**
+
+
 Built for the [OpenEnv AI Hackathon](https://pytorch.org/event/openenv-ai-hackathon/) (Meta × Hugging Face × PyTorch)
 
 [Live Demo](https://huggingface.co/spaces/m-zest/incident-response-env-sre) · [Architecture](#architecture) · [Quick Start](#quick-start) · [Scenarios](#scenarios)
